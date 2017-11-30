@@ -33,10 +33,7 @@ function [I,value] = iqr_method(a,type)
 % Cyril Pernet / Guillaume Rousselet 
 % ---------------------------------
 %  Copyright (C) Corr_toolbox 2012
-
-if nargin == 1
-    type = 2;
-end 
+ 
 a=a(:);n=length(a);
 [q1,q2]=idealf(a);
 value=q2-q1;

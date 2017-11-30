@@ -1,4 +1,4 @@
-function [r,t,pval,hboot,CI] = Pearson(X,Y,fig_flag,level)
+function [r,t,pval,hboot,CI,pboot] = Pearson(X,Y,fig_flag,level)
 
 % compute the Pearson correlation along with the bootstrap CI
 %
@@ -22,15 +22,11 @@ function [r,t,pval,hboot,CI] = Pearson(X,Y,fig_flag,level)
 %
 % If X and Y are matrices of size [n p], p correlations are computed
 % consequently, the CI are adjusted at a level alpha/p (Bonferonni
-% correction) and hboot is based on these adjusted CI but pval remains
-% uncorrected - note also that if some values are NaN, the adjustement 
-% is based on the largest n
-%
-% This function requires the nansum.m function
-% from the matlab stat toolbox. 
-%
-% Cyril Pernet v2 (10-01-2014 - deals with NaN)
-% ---------------------------------------------
+% correction) and hboot is based on these adjusted CI (pval remain
+% uncorrected)
+
+% Cyril Pernet v1
+% ---------------------------------
 %  Copyright (C) Corr_toolbox 2012
 
 %% data check
@@ -61,27 +57,20 @@ elseif nargin == 3
 end
 
 [n p] = size(X);
-if p==1
-    [X Y]=pairwise_cleanup(X,Y);
-    [n p] = size(X);
-end
 
 %% basic Pearson
 
 % compute r 
-r = nansum(demean(X).*demean(Y)) ./ ...
-    (nansum(demean(X).^2).*nansum(demean(Y).^2)).^(1/2);
+r = sum(detrend(X,'constant').*detrend(Y,'constant')) ./ ...
+    (sum(detrend(X,'constant').^2).*sum(detrend(Y,'constant').^2)).^(1/2);
 t = r.*sqrt((n-2)./(1-r.^2));
 pval = 2*tcdf(-abs(t),n-2);
 
-%% bootstrap 
 if nargout > 3
     % adjust boot parameters
     if p == 1
         nboot = 599;
         % adjust percentiles following Wilcox
-        % even if NaN n is fine since data have
-        % been cleaned up
         if n < 40
             low = 7 ; high = 593;
         elseif n >= 40 && n < 80
@@ -105,19 +94,15 @@ if nargout > 3
             high = nboot - low;
         end
     end
-    
     % compute hboot and CI
     table = randi(n,n,nboot);
     for B=1:nboot
-        rb(B,:) = nansum(demean(X(table(:,B),:)).*demean(Y(table(:,B),:))) ./ ...
-            (nansum(demean(X(table(:,B),:)).^2).*nansum(demean(Y(table(:,B),:)).^2)).^(1/2);
-        if fig_flag ~= 0 % to make a nice figure get regression values
-            for c=1:size(X,2)
-                tmp = [X(table(:,B),c) Y(table(:,B),c)]; % take a pair
-                tmp(find(sum(isnan(tmp),2)),:) = []; % remove NaNs
-                b = pinv([tmp(:,1) ones(size(tmp,1),1)])*tmp(:,2); % solve
-                slope(B,c) = b(1); intercept(B,c) = b(2,:);
-            end
+        rb(B,:) = sum(detrend(X(table(:,B),:),'constant').*detrend(Y(table(:,B),:),'constant')) ./ ...
+            (sum(detrend(X(table(:,B),:),'constant').^2).*sum(detrend(Y(table(:,B),:),'constant').^2)).^(1/2);
+        for c=1:size(X,2)
+            b = pinv([X(table(:,B),c) ones(n,1)])*Y(table(:,B),c);
+            slope(B,c) = b(1); 
+            intercept(B,c) = b(2,:);
         end
     end
     

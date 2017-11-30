@@ -1,4 +1,4 @@
-function [r,t,h,outid,hboot,CI]=skipped_correlation(x,y,fig_flag,estimator)
+function [r,t,h,outid,hboot,CI]=skipped_correlation(X,fig_flag)
 
 % performs a robust correlation using pearson/spearman correlation on
 % data cleaned up for bivariate outliers - that is after finding the
@@ -7,22 +7,18 @@ function [r,t,h,outid,hboot,CI]=skipped_correlation(x,y,fig_flag,estimator)
 % bound defined by the idealf estimator of the interquartile range is removed.
 % 
 % FORMAT:
-%          [r,t,h] = skipped_correlation(X,Y);
-%          [r,t,h] = skipped_correlation(X,Y,fig_flag);
-%          [r,t,h] = skipped_correlation(X,Y,fig_flag,'estimator');
+%          [r,t,h] = skipped_correlation(X);
+%          [r,t,h] = skipped_correlation(X,fig_flag);
 %          [r,t,h,outid,hboot,CI] = skipped_correlation(X,Y,fig_flag);
 %
-% INPUTS:  X and Y are 2 vectors or matrices, in the latter case,
-%          Spearman correlations are computed column-wise (only Spearman 
-%          because there is no good control over type 1 error with Pearson)  
-%          fig_flag (1/0) indicates to plot the data or not
-%          'estimator' is either 'Pearson' or 'Spearman'
+% INPUTS:  X is a matrix and corelations between all pairs (default) are computed
+%          pairs (optional) is a n*2 matrix of pairs of column to correlate  
+%          fig_flag (optional, ( by default) indicates to plot the data or not
 %
 % OUTPUTS:
 %          r is the pearson/spearman correlation 
 %          t is the T value associated to the skipped correlation
 %          h is the hypothesis of no association at alpha = 5% 
-%            if NaN, h depends on the largest n across columns
 %          outid is the index of bivariate outliers
 % 
 %          optional:
@@ -43,9 +39,8 @@ function [r,t,h,outid,hboot,CI]=skipped_correlation(x,y,fig_flag,estimator)
 % thus for a correlation this is floor(n/2 + 5/2).
 %
 % See also MCDCOV, IDEALF.
-%
+
 % Cyril Pernet & Guillaume Rousselet, v1 - April 2012
-% Cyril Pernet v2 (10-01-2014 - deals with NaN) 
 % ---------------------------------------------------
 %  Copyright (C) Corr_toolbox 2012
 
@@ -55,24 +50,13 @@ if nargin <2
     error('not enough input arguments');
 elseif nargin == 2
     fig_flag = 1;
-    estimator = [];
-elseif nargin > 4
+elseif nargin > 3
     error('too many input arguments');
 end
 
 % transpose if x or y are not in column
 if size(x,1) == 1 && size(x,2) > 1; x = x'; end
 if size(y,1) == 1 && size(y,2) > 1; y = y'; end
-if (size(x,2)+size(y,2)) == 2 % input is 2 vectors
-    [x,y] = pairwise_cleanup(x, y); % check for NaN here, otherwise deal with NaN column wise
-end
-
-if nargin == 4 && (size(x,2)+size(y,2)) ~= 2 % input is not 2 vectors
-    if strcmp(estimator,'Pearson') == 1
-        errordlg('Pearson cannot be used to control the type 1 error on multiple variables - switching to Spearman');
-        estimator = [];
-    end
-end
 
 % if X a vector and Y a matrix, 
 % repmat X to perform multiple tests on Y (or the other around)
@@ -109,58 +93,11 @@ for column = 1:p
         fprintf('skipped correlation: processing pair %g \n',column); 
     end
     
-    % get the centre of the bivariate distributions
-    [xx,yy] = pairwise_cleanup(x(:,column), y(:,column));
-    X = [xx yy]; n = size(X,1);
-    if n < 10
-        error('after NaN removal, there are less than 10 observations - robust correlation can''t be computed')
-    end
-    result=mcdcov(X,'cor',1,'plots',0,'h',floor((n+size(X,2)*2+1)/2));
-    center = result.center;
-    
-     
-    % orthogonal projection to the lines joining the center
-    % followed by outlier detection using the boxplot rule
-    
-    vec=1:n;
-    for i=1:n % for each row
-        dis=NaN(n,1);
-        B = (X(i,:)-center)';
-        BB = B.^2;
-        bot = sum(BB);
-        if bot~=0
-            for j=1:n
-                A = (X(j,:)-center)';
-                dis(j)= norm(A'*B/bot.*B); 
-            end
-            
-            % MAD median rule
-            % [outliers,value] = madmedianrule(dis,2);
-            % record{i} = dis > (median(dis)+gval.*value);
-            
-            % IQR rule
-            [ql,qu]=idealf(dis);
-            record{i} = (dis > median(dis)+gval.*(qu-ql)) ; % + (dis < median(dis)-gval.*(qu-ql));
-        end
-    end
-    
-    try
-        flag = nan(n,1);
-        flag = sum(cell2mat(record),2); % if any point is flagged
-        
-    catch ME  % this can happen to have an empty cell so loop
-        flag = nan(n,size(record,2));
-        index = 1;
-        for s=1:size(record,2)
-          if ~isempty(record{s})
-              flag(:,index) = record{s};
-              index = index+1;
-          end
-        end
-        flag(:,index:end) = [];
-        flag = sum(flag,2);
-    end
-            
+    X = [x(:,column) y(:,column)];
+    % flag bivariate outliers
+    flag = bivariate_outliers(X);
+    % remove outliers
+    vec=1:n;           
     if sum(flag)==0
         outid{column}=[];
     else
@@ -172,53 +109,37 @@ for column = 1:p
     %% Pearson/Spearman correlation
     
     if  p == 1 % in the special case of a single test Pearson is valid too
-        a{column} = xx(keep);
-        b{column} = yy(keep);
+        a{column} = x(keep);
+        b{column} = y(keep);
         
-        rp = sum(demean(a{column}).*demean(b{column})) ./ ...
-            (sum(demean(a{column}).^2).*sum(demean(b{column}).^2)).^(1/2);
+        rp = sum(detrend(a{column},'constant').*detrend(b{column},'constant')) ./ ...
+            (sum(detrend(a{column},'constant').^2).*sum(detrend(b{column},'constant').^2)).^(1/2);
         tp = rp*sqrt((n-2)/(1-rp.^2));
         r.Pearson = rp; t.Pearson = tp;
         
         xrank = tiedrank(a{column},0); yrank = tiedrank(b{column},0);
-        rs = sum(demean(xrank).*demean(yrank)) ./ ...
-            (sum(demean(xrank).^2).*sum(demean(yrank).^2)).^(1/2);
+        rs = sum(detrend(xrank,'constant').*detrend(yrank,'constant')) ./ ...
+            (sum(detrend(xrank,'constant').^2).*sum(detrend(yrank,'constant').^2)).^(1/2);
         ts = rs*sqrt((n-2)/(1-rs.^2));
         r.Spearman = rs; t.Spearman = ts;
-        
-        % update outputs if estimator selected
-        if strcmp(estimator,'Pearson')
-           clear r t; r = rp; t = tp;
-        elseif strcmp(estimator,'Spearman')
-           clear r t; r = rs; t = ts;
-        end
     
     else % multiple tests, only use Spearman to control type 1 error
-        a{column} = xx(keep); xrank = tiedrank(a{column},0); 
-        b{column} = yy(keep); yrank = tiedrank(b{column},0);
-        r(column) = sum(demean(xrank).*demean(yrank)) ./ ...
-            (sum(demean(xrank).^2).*sum(demean(yrank).^2)).^(1/2);
+        a{column} = x(keep,column); xrank = tiedrank(a{column},0); 
+        b{column} = y(keep,column); yrank = tiedrank(b{column},0);
+        r(column) = sum(detrend(xrank,'constant').*detrend(yrank,'constant')) ./ ...
+            (sum(detrend(xrank,'constant').^2).*sum(detrend(yrank,'constant').^2)).^(1/2);
         t(column) = r(column)*sqrt((n-2)/(1-r(column).^2));
     end
-    
-    clear X result centre dis record
-
 end
 
 %% get h
 
 % the default test of 0 correlation is for alpha = 5%
-n = size(x,1); % readjust n to the largest available
+
 c = 6.947 / n + 2.3197; % valid for n between 10 and 200
 if p == 1
-    if strcmp(estimator,'Pearson')
-        h = abs(tp) >= c;
-    elseif strcmp(estimator,'Spearman')
-        h = abs(ts) >= c;
-    else
-        h.Pearson = abs(tp) >= c;
-        h.Spearman = abs(ts) >= c;
-    end
+    h.Pearson = abs(tp) >= c;
+    h.Spearman = abs(ts) >= c;
 else
     h= abs(t) >= c;
 end
@@ -280,15 +201,15 @@ if nargout > 4
             % do Spearman
             tmp1 = a{column}; xrank = tiedrank(tmp1(table(:,B)),0);
             tmp2 = b{column}; yrank = tiedrank(tmp2(table(:,B)),0);
-            rsb(B,column) = sum(demean(xrank).*demean(yrank)) ./ ...
-                (sum(demean(xrank).^2).*sum(demean(yrank).^2)).^(1/2);
+            rsb(B,column) = sum(detrend(xrank,'constant').*detrend(yrank,'constant')) ./ ...
+                (sum(detrend(xrank,'constant').^2).*sum(detrend(yrank,'constant').^2)).^(1/2);
             % get regression lines for Spearman
             coef = pinv([xrank ones(length(a{column}),1)])*yrank;
             sslope(B,column) = coef(1); sintercept(B,column) = coef(2,:);
             
             if p == 1 % ie only 1 correlation thus Pearson is good too
-                rpb(B,column) = nansum(demean(tmp1(table(:,B))).*demean(tmp2(table(:,B)))) ./ ...
-                    (nansum(demean(tmp1(table(:,B))).^2).*nansum(demean(tmp2(table(:,B))).^2)).^(1/2);
+                rpb(B,column) = sum(detrend(tmp1(table(:,B)),'constant').*detrend(tmp2(table(:,B)),'constant')) ./ ...
+                    (sum(detrend(tmp1(table(:,B)),'constant').^2).*sum(detrend(tmp2(table(:,B)),'constant').^2)).^(1/2);
                 coef = pinv([tmp1(table(:,B)) ones(length(a{column}),1)])*tmp2(table(:,B));
                 pslope(B,column) = coef(1); pintercept(B,column) = coef(2,:);
             end
@@ -346,24 +267,12 @@ if nargout > 4
         
         % update outputs
         tmp = hboot; clear hboot;
-        if strcmp(estimator,'Pearson')
-            hboot = hbootp;
-        elseif strcmp(estimator,'Spearman')
-            hboot = tmp;
-        else
-            hboot.Spearman = tmp;
-            hboot.Pearson = hbootp;
-        end
+        hboot.Spearman = tmp;
+        hboot.Pearson = hbootp;
         
         tmp = CI; clear CI
-        if strcmp(estimator,'Pearson')
-            CI = CIp';
-        elseif strcmp(estimator,'Spearman')
-            CI = tmp';
-        else
-            CI.Spearman = tmp';
-            CI.Pearson = CIp';
-        end
+        CI.Spearman = tmp';
+        CI.Pearson = CIp';
     end
 end
     
@@ -378,186 +287,71 @@ if fig_flag ~= 0
             set(gcf,'Color','w');
         end
         
-        
-        if strcmp(estimator,'Pearson') == 1
-            if nargout>4
-                if ~isnan(r); subplot(1,2,1); end
-                M = sprintf('Skipped correlation \n Pearson r=%g CI=[%g %g]',r,CI(1),CI(2));
-            else
-                M = sprintf('Skipped correlation \n Pearson r=%g h=%g',r,h);
-            end
-            
-            scatter(a{1},b{1},100,'b','fill');
-            grid on; hold on;
-            hh = lsline; set(hh,'Color','r','LineWidth',4);
-            try
-                [XEmin, YEmin] = ellipse(a{column},b{column});
-                plot(real(XEmin), real(YEmin),'LineWidth',2);
-                MM = [min(XEmin) max(XEmin) min(YEmin) max(YEmin)];
-            catch ME
-                text(min(x)+0.01*(min(x)),max(y),'no ellipse found','Fontsize',12)
-                MM = [];
-            end
-            xlabel('X','Fontsize',12); ylabel('Y','Fontsize',12);
-            title(M,'Fontsize',16);
-            
-            % add outliers and scale axis
-            scatter(x(outid{1}),y(outid{1}),100,'r','filled');
-            MM2 = [min(x) max(x) min(y) max(y)];
-            if isempty(MM); MM = MM2; end
-            A = floor(min([MM(:,1);MM2(:,1)]) - min([MM(:,1);MM2(:,1)])*0.01);
-            B = ceil(max([MM(:,2);MM2(:,2)]) + max([MM(:,2);MM2(:,2)])*0.01);
-            C = floor(min([MM(:,3);MM2(:,3)]) - min([MM(:,3);MM2(:,3)])*0.01);
-            D = ceil(max([MM(:,4);MM2(:,4)]) + max([MM(:,4);MM2(:,4)])*0.01);
-            axis([A B C D]);
-            box on;set(gca,'Fontsize',14)
-            
-            if nargout>4 && sum(~isnan(CIpslope))==2
-                % add CI
-                y1 = refline(CIpslope(1),CIpintercept(1)); set(y1,'Color','r');
-                y2 = refline(CIpslope(2),CIpintercept(2)); set(y2,'Color','r');
-                y1 = get(y1); y2 = get(y2);
-                xpoints=[[y1.XData(1):y1.XData(2)],[y2.XData(2):-1:y2.XData(1)]];
-                step1 = y1.YData(2)-y1.YData(1); step1 = step1 / (y1.XData(2)-y1.XData(1));
-                step2 = y2.YData(2)-y2.YData(1); step2 = step2 / (y2.XData(2)-y2.XData(1));
-                filled=[[y1.YData(1):step1:y1.YData(2)],[y2.YData(2):-step2:y2.YData(1)]];
-                hold on; fillhandle=fill(xpoints,filled,[1 0 0]);
-                set(fillhandle,'EdgeColor',[1 0 0],'FaceAlpha',0.2,'EdgeAlpha',0.8);%set edge color
-                
-                % add histograms of bootstrap
-                subplot(1,2,2); k = round(1 + log2(length(rpb))); hist(rpb,k); grid on;
-                mytitle = sprintf('Bootstrapped \n Pearsons'' corr h=%g', hboot);
-                title(mytitle,'FontSize',16); hold on
-                xlabel('boot correlations','FontSize',14);ylabel('frequency','FontSize',14)
-                plot(repmat(CI(1),max(hist(rpb,k)),1),[1:max(hist(rpb,k))],'r','LineWidth',4);
-                plot(repmat(CI(2),max(hist(rpb,k)),1),[1:max(hist(rpb,k))],'r','LineWidth',4);
-                axis tight; colormap([.4 .4 1])
-                box on;set(gca,'Fontsize',14)
-            end
-            
-        elseif strcmp(estimator,'Spearman') == 1
-            
-            if nargout>4
-                if ~isnan(r); subplot(1,2,1); end
-                M = sprintf('Skipped correlation \n Spearman r=%g CI=[%g %g]',r,CI(1),CI(2));
-            else
-                M = sprintf('Skipped correlation \n Spearman r=%g h=%g',r,h);
-            end
-            
-            scatter(a{1},b{1},100,'b','fill');
-            grid on; hold on;
-            hh = lsline; set(hh,'Color','r','LineWidth',4);
-            try
-                [XEmin, YEmin] = ellipse(a{column},b{column});
-                plot(real(XEmin), real(YEmin),'LineWidth',2);
-                MM = [min(XEmin) max(XEmin) min(YEmin) max(YEmin)];
-            catch ME
-                text(min(x)+0.01*(min(x)),max(y),'no ellipse found','Fontsize',12)
-                MM = [];
-            end
-            xlabel('X','Fontsize',12); ylabel('Y','Fontsize',12);
-            title(M,'Fontsize',16);
-            
-            % add outliers and scale axis
-            scatter(x(outid{1}),y(outid{1}),100,'r','filled');
-            MM2 = [min(x) max(x) min(y) max(y)];
-            if isempty(MM); MM = MM2; end
-            A = floor(min([MM(:,1);MM2(:,1)]) - min([MM(:,1);MM2(:,1)])*0.01);
-            B = ceil(max([MM(:,2);MM2(:,2)]) + max([MM(:,2);MM2(:,2)])*0.01);
-            C = floor(min([MM(:,3);MM2(:,3)]) - min([MM(:,3);MM2(:,3)])*0.01);
-            D = ceil(max([MM(:,4);MM2(:,4)]) + max([MM(:,4);MM2(:,4)])*0.01);
-            axis([A B C D]);
-            box on;set(gca,'Fontsize',14)
-            
-            if nargout>4 && sum(~isnan(CIpslope))==2
-                % add CI
-                y1 = refline(CIsslope(1),CIsintercept(1)); set(y1,'Color','r');
-                y2 = refline(CIsslope(2),CIsintercept(2)); set(y2,'Color','r');
-                y1 = get(y1); y2 = get(y2);
-                xpoints=[[y1.XData(1):y1.XData(2)],[y2.XData(2):-1:y2.XData(1)]];
-                step1 = y1.YData(2)-y1.YData(1); step1 = step1 / (y1.XData(2)-y1.XData(1));
-                step2 = y2.YData(2)-y2.YData(1); step2 = step2 / (y2.XData(2)-y2.XData(1));
-                filled=[[y1.YData(1):step1:y1.YData(2)],[y2.YData(2):-step2:y2.YData(1)]];
-                hold on; fillhandle=fill(xpoints,filled,[1 0 0]);
-                set(fillhandle,'EdgeColor',[1 0 0],'FaceAlpha',0.2,'EdgeAlpha',0.8);%set edge color
-                
-                % add histograms of bootstrap
-                subplot(1,2,2); k = round(1 + log2(length(rsb))); hist(rsb,k); grid on;
-                mytitle = sprintf('Bootstrapped \n Spearmans'' corr h=%g', hboot);
-                title(mytitle,'FontSize',16); hold on
-                xlabel('boot correlations','FontSize',14);ylabel('frequency','FontSize',14)
-                plot(repmat(CI(1),max(hist(rsb,k)),1),[1:max(hist(rsb,k))],'r','LineWidth',4);
-                plot(repmat(CI(2),max(hist(rsb,k)),1),[1:max(hist(rsb,k))],'r','LineWidth',4);
-                axis tight; colormap([.4 .4 1])
-                box on;set(gca,'Fontsize',14)
-            end
-            
+        if nargout>4
+            if ~isnan(r.Pearson); subplot(1,3,1); end
+            M = sprintf('Skipped correlation \n Pearson r=%g CI=[%g %g] \n Spearman r=%g CI=[%g %g]',r.Pearson,CI.Pearson(1),CI.Pearson(2),r.Spearman,CI.Spearman(1),CI.Spearman(2));
         else
-            if nargout>4
-                if ~isnan(r.Pearson); subplot(1,3,1); end
-                M = sprintf('Skipped correlation \n Pearson r=%g CI=[%g %g] \n Spearman r=%g CI=[%g %g]',r.Pearson,CI.Pearson(1),CI.Pearson(2),r.Spearman,CI.Spearman(1),CI.Spearman(2));
-            else
-                M = sprintf('Skipped correlation \n Pearson r=%g h=%g \n Spearman r=%g h=%g',r.Pearson,h.Pearson,r.Spearman,h.Spearman);
-            end
+            M = sprintf('Skipped correlation \n Pearson r=%g h=%g \n Spearman r=%g h=%g',r.Pearson,h.Pearson,r.Spearman,h.Spearman);
+        end
+        
+        scatter(a{1},b{1},100,'b','fill');
+        grid on; hold on;
+        hh = lsline; set(hh,'Color','r','LineWidth',4);
+        try
+            [XEmin, YEmin] = ellipse(a{column},b{column});
+            plot(real(XEmin), real(YEmin),'LineWidth',2);
+            MM = [min(XEmin) max(XEmin) min(YEmin) max(YEmin)];
+        catch ME
+            text(min(x)+0.01*(min(x)),max(y),'no ellipse found','Fontsize',12)
+            MM = [];
+        end
+        xlabel('X','Fontsize',12); ylabel('Y','Fontsize',12);
+        title(M,'Fontsize',16);
+        
+        % add outliers and scale axis
+        scatter(x(outid{1}),y(outid{1}),100,'r','filled');
+        MM2 = [min(x) max(x) min(y) max(y)];
+        if isempty(MM); MM = MM2; end
+        A = floor(min([MM(:,1);MM2(:,1)]) - min([MM(:,1);MM2(:,1)])*0.01);
+        B = ceil(max([MM(:,2);MM2(:,2)]) + max([MM(:,2);MM2(:,2)])*0.01);
+        C = floor(min([MM(:,3);MM2(:,3)]) - min([MM(:,3);MM2(:,3)])*0.01);
+        D = ceil(max([MM(:,4);MM2(:,4)]) + max([MM(:,4);MM2(:,4)])*0.01);
+        axis([A B C D]);
+        box on;set(gca,'Fontsize',14)
+        
+        if nargout>4 && sum(~isnan(CIpslope))==2
+            % add CI
+            y1 = refline(CIpslope(1),CIpintercept(1)); set(y1,'Color','r');
+            y2 = refline(CIpslope(2),CIpintercept(2)); set(y2,'Color','r');
+            y1 = get(y1); y2 = get(y2);
+            xpoints=[[y1.XData(1):y1.XData(2)],[y2.XData(2):-1:y2.XData(1)]];
+            step1 = y1.YData(2)-y1.YData(1); step1 = step1 / (y1.XData(2)-y1.XData(1));
+            step2 = y2.YData(2)-y2.YData(1); step2 = step2 / (y2.XData(2)-y2.XData(1));
+            filled=[[y1.YData(1):step1:y1.YData(2)],[y2.YData(2):-step2:y2.YData(1)]];
+            hold on; fillhandle=fill(xpoints,filled,[1 0 0]);
+            set(fillhandle,'EdgeColor',[1 0 0],'FaceAlpha',0.2,'EdgeAlpha',0.8);%set edge color
             
-            scatter(a{1},b{1},100,'b','fill');
-            grid on; hold on;
-            hh = lsline; set(hh,'Color','r','LineWidth',4);
-            try
-                [XEmin, YEmin] = ellipse(a{column},b{column});
-                plot(real(XEmin), real(YEmin),'LineWidth',2);
-                MM = [min(XEmin) max(XEmin) min(YEmin) max(YEmin)];
-            catch ME
-                text(min(x)+0.01*(min(x)),max(y),'no ellipse found','Fontsize',12)
-                MM = [];
-            end
-            xlabel('X','Fontsize',12); ylabel('Y','Fontsize',12);
-            title(M,'Fontsize',16);
-            
-            % add outliers and scale axis
-            scatter(x(outid{1}),y(outid{1}),100,'r','filled');
-            MM2 = [min(x) max(x) min(y) max(y)];
-            if isempty(MM); MM = MM2; end
-            A = floor(min([MM(:,1);MM2(:,1)]) - min([MM(:,1);MM2(:,1)])*0.01);
-            B = ceil(max([MM(:,2);MM2(:,2)]) + max([MM(:,2);MM2(:,2)])*0.01);
-            C = floor(min([MM(:,3);MM2(:,3)]) - min([MM(:,3);MM2(:,3)])*0.01);
-            D = ceil(max([MM(:,4);MM2(:,4)]) + max([MM(:,4);MM2(:,4)])*0.01);
-            axis([A B C D]);
+            % add histograms of bootstrap
+            subplot(1,3,2); k = round(1 + log2(length(rpb))); hist(rpb,k); grid on;
+            mytitle = sprintf('Bootstrapped \n Pearsons'' corr h=%g', hboot.Pearson);
+            title(mytitle,'FontSize',16); hold on
+            xlabel('boot correlations','FontSize',14);ylabel('frequency','FontSize',14)
+            plot(repmat(CI.Pearson(1),max(hist(rpb,k)),1),[1:max(hist(rpb,k))],'r','LineWidth',4);
+            plot(repmat(CI.Pearson(2),max(hist(rpb,k)),1),[1:max(hist(rpb,k))],'r','LineWidth',4);
+            axis tight; colormap([.4 .4 1])
             box on;set(gca,'Fontsize',14)
             
-            if nargout>4 && sum(~isnan(CIpslope))==2
-                % add CI
-                y1 = refline(CIpslope(1),CIpintercept(1)); set(y1,'Color','r');
-                y2 = refline(CIpslope(2),CIpintercept(2)); set(y2,'Color','r');
-                y1 = get(y1); y2 = get(y2);
-                xpoints=[[y1.XData(1):y1.XData(2)],[y2.XData(2):-1:y2.XData(1)]];
-                step1 = y1.YData(2)-y1.YData(1); step1 = step1 / (y1.XData(2)-y1.XData(1));
-                step2 = y2.YData(2)-y2.YData(1); step2 = step2 / (y2.XData(2)-y2.XData(1));
-                filled=[[y1.YData(1):step1:y1.YData(2)],[y2.YData(2):-step2:y2.YData(1)]];
-                hold on; fillhandle=fill(xpoints,filled,[1 0 0]);
-                set(fillhandle,'EdgeColor',[1 0 0],'FaceAlpha',0.2,'EdgeAlpha',0.8);%set edge color
-                
-                % add histograms of bootstrap
-                subplot(1,3,2); k = round(1 + log2(length(rpb))); hist(rpb,k); grid on;
-                mytitle = sprintf('Bootstrapped \n Pearsons'' corr h=%g', hboot.Pearson);
-                title(mytitle,'FontSize',16); hold on
-                xlabel('boot correlations','FontSize',14);ylabel('frequency','FontSize',14)
-                plot(repmat(CI.Pearson(1),max(hist(rpb,k)),1),[1:max(hist(rpb,k))],'r','LineWidth',4);
-                plot(repmat(CI.Pearson(2),max(hist(rpb,k)),1),[1:max(hist(rpb,k))],'r','LineWidth',4);
-                axis tight; colormap([.4 .4 1])
-                box on;set(gca,'Fontsize',14)
-                
-                subplot(1,3,3); k = round(1 + log2(length(rsb))); hist(rsb,k); grid on;
-                mytitle = sprintf('Bootstrapped \n Spearmans'' corr h=%g', hboot.Spearman);
-                title(mytitle,'FontSize',16); hold on
-                xlabel('boot correlations','FontSize',14);ylabel('frequency','FontSize',14)
-                plot(repmat(CI.Spearman(1),max(hist(rsb,k)),1),[1:max(hist(rsb,k))],'r','LineWidth',4);
-                plot(repmat(CI.Spearman(2),max(hist(rsb,k)),1),[1:max(hist(rsb,k))],'r','LineWidth',4);
-                axis tight; colormap([.4 .4 1])
-                box on;set(gca,'Fontsize',14)
-            end
+            subplot(1,3,3); k = round(1 + log2(length(rsb))); hist(rsb,k); grid on;
+            mytitle = sprintf('Bootstrapped \n Spearmans'' corr h=%g', hboot.Spearman); 
+            title(mytitle,'FontSize',16); hold on
+            xlabel('boot correlations','FontSize',14);ylabel('frequency','FontSize',14)
+            plot(repmat(CI.Spearman(1),max(hist(rsb,k)),1),[1:max(hist(rsb,k))],'r','LineWidth',4);
+            plot(repmat(CI.Spearman(2),max(hist(rsb,k)),1),[1:max(hist(rsb,k))],'r','LineWidth',4);
+            axis tight; colormap([.4 .4 1])
+            box on;set(gca,'Fontsize',14)
         end
     end
+    
     
     if strcmp(answer,'yes')
         for f = 1:p
@@ -757,7 +551,7 @@ for f = 1:n - 2
 
             % Newton iterative method
             theta = pi; error = 1;
-            while abs(error) > 1e-4
+            while abs(error) > 1e-6
                 cth = cos(theta); sth = sin(theta);
                 a1 = a(1) * cth + b(1) * sth; b1 = -a(1) * sth + b(1) * cth;
                 a2 = a(2) * cth + b(2) * sth; b2 = -a(2) * sth + b(2) * cth;

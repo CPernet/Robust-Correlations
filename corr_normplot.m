@@ -15,8 +15,6 @@ if size(x)~=size(y)
     error('X and Y must have the same size')
 end
 
-[x,y]=pairwise_cleanup(x,y);
-
 [r c] = size(x);
 if r == 1 && c > 1
     x = x'; 

@@ -184,10 +184,6 @@ if nargin < 1
     return;
 end
 
-% remove NaNs
-% -----------
-X(find(sum(isnan(X),2)),:) = [];
-
 if c == 1  %covariance matrix normalizes by (n) [=default]
     S = cov(X,1);
 else   %covariance matrix normalizes by (n-1)

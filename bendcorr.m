@@ -20,11 +20,10 @@ function [r,t,p,hboot,CI,H,pH] = bendcorr(X,Y,fig_flag,beta)
 %          pH is the p value for an omnibus test of independence between all pairs 
 %
 % The percentage bend correlation is a robust method that protects against
-% outliers among the marginal distributions. If NaN values are present, the
-% smallest available n is used across all pairs.
-%
+% outliers among the marginal distributions.
+
 % Cyril Pernet and Guillaume Rousselet 26-01-2011
-% Reformatted for Corr_toolbox 02-7-2012 
+% Reformatted for Corr_toolbox 02--7-2012 
 % ----------------------------------------------
 %  Copyright (C) Corr_toolbox 2012
 

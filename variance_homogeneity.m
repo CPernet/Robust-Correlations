@@ -18,14 +18,12 @@ function [h,CI] = variance_homogeneity(x,y,condition)
 %  Copyright (C) Corr_toolbox 2012
   
 if nargin == 2
-    condition = 1;
+    condition = 1
 end
 
 if size(x)~=size(y)
     error('X and Y must have the same size')
 end
-
-[x,y]=pairwise_cleanup(x,y);
 
 % computes
 nboot = 600;

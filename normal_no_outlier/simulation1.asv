@@ -1,0 +1,39 @@
+% Simulations for normally distributed data
+% It is expected that all methods perform well
+% with Pearson's being the best
+
+mkdir('normal_no_outlier')
+cd('normal_no_outlier')
+
+n = 20;
+p= 6;
+SIGMA = eye(p);
+SIGMA(SIGMA==1) = abs(randn(p,1));
+
+tic
+[r_alpha,t_alpha,p_alpha,vr,vt,vp]  = MC_corrpval(n,p,'Skipped Pearson');
+time = toc
+save results
+
+parfor MC = 1:1000
+    fprintf('running simulations MC %g\n',MC)
+    X = mvnrnd(zeros(1,p),SIGMA,n);
+    [r(:,MC),t(:,MC),pval(:,MC)] = skipped_Pearson(X,[],'ECP',5/100);  
+end
+
+FWE_p = length(find(sum(pval<=p_alpha,1)))/1000;
+FWE_r = length(find(sum(r>quantile(vr,0.05),1)))/1000;
+FWE_t = length(find(sum(t>=t_alpha,1)))/1000;
+save results
+
+parfor MC = 1:600
+    fprintf('running simulations MC %g\n',MC)
+    X = mvnrnd(zeros(1,p),SIGMA,n);
+    p_alpha2 = MC_corrpval(n,p,'Skipped Pearson',5/100,[],diag(cov(X)));
+    [~,~,~,h2(MC,:)] = skipped_Pearson(X,[],'ECP',5/100,p_alpha2);
+end
+FWE2 = sum(h2)/600;
+save results
+
+
+    

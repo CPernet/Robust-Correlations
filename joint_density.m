@@ -7,10 +7,10 @@ function density = joint_density(x,y,flag)
 %
 % INPUTS: x and y are two vectors of the same length
 %         flag if 1 (default) plot both the mesh and isocontour else only plot isocontrour 
-%
+
 % Ref: Martinez, W.L. & Martinez, A.R. 2008.
 % Computational Statistics Handbook with Matlab. 2nd Ed. 
-%
+
 % Cyril Pernet v2 23/07/2012 
 % -----------------------------
 % Copyright (C) Corr_toolbox 2012
@@ -22,8 +22,6 @@ end
 if size(x)~=size(y)
     error('X and Y must have the same size')
 end
-
-[x,y]=pairwise_cleanup(x,y);
 
 [r c] = size(x);
 if r == 1 && c > 1

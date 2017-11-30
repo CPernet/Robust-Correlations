@@ -20,14 +20,14 @@ function [r,t,pval,hboot,CI] = Spearman(X,Y,fig_flag,level)
 % If X and Y are matrices of size [n p], p correlations are computed
 % and the CIs are adjusted at the alpha/p level (Bonferonni
 % correction); hboot is based on these adjusted CIs but pval remains
-% uncorrected - note also that if some values are NaN, the adjustement 
-% is based on the largest n
+% uncorrected.
 %
-% This function requires the tiedrank.m and nansum.m functions
-% from the matlab stat toolbox. 
+% This function requires the tiedrank.m function from the matlab stat toolbox. 
 %
-% Cyril Pernet v2 (10-01-2014 - deals with NaN)
-% ---------------------------------------------
+% See also TIEDRANK.
+
+% Cyril Pernet v1
+% ---------------------------------
 %  Copyright (C) Corr_toolbox 2012
 
 %% data check
@@ -58,27 +58,21 @@ elseif nargin == 3
 end
 
 [n p] = size(X);
-if p==1
-    [X Y]=pairwise_cleanup(X,Y);
-    [n p] = size(X);
-end
 
 %% basic Spearman
 
+% compute r (default)
+xrank = tiedrank(X,0);
+yrank = tiedrank(Y,0);
+r = sum(detrend(xrank,'constant').*detrend(yrank,'constant')) ./ ...
+    (sum(detrend(xrank,'constant').^2).*sum(detrend(yrank,'constant').^2)).^(1/2);
+t = r.*(sqrt(n-2)) ./ sqrt((1-r.^2));
+pval = 2*tcdf(-abs(t),n-2);
 % The corr function in the stat toolbox uses
 % permutations for n<10 and some other fancy
 % things when n>10 and there are no ties among
 % ranks - we just do the standard way.
 
-% compute r (default)
-xrank = tiedrank(X,0);
-yrank = tiedrank(Y,0);
-r = nansum(demean(xrank).*demean(yrank)) ./ ...
-    (nansum(demean(xrank).^2).*nansum(demean(yrank).^2)).^(1/2);
-t = r.*(sqrt(n-2)) ./ sqrt((1-r.^2));
-pval = 2*tcdf(-abs(t),n-2);
-
-%% bootstrap
 if nargout > 3
     nboot = 1000;
     if p > 1
@@ -96,15 +90,11 @@ if nargout > 3
     for B=1:nboot
         xrank = tiedrank(X(table(:,B),:),0);
         yrank = tiedrank(Y(table(:,B),:),0);
-        rb(B,:) = nansum(demean(xrank).*demean(yrank)) ./ ...
-            (nansum(demean(xrank).^2).*nansum(demean(yrank).^2)).^(1/2);
-        if fig_flag ~= 0 % to make a nice figure get regression values
-            for c=1:size(X,2)
-                tmp = [xrank(:,c) yrank(:,c)]; % take a pair
-                tmp(find(sum(isnan(tmp),2)),:) = []; % remove NaNs
-                b = pinv([tmp(:,1) ones(size(tmp,1),1)])*tmp(:,2); % solve
-                slope(B,c) = b(1); intercept(B,c) = b(2,:);
-            end
+        rb(B,:) = sum(detrend(xrank,'constant').*detrend(yrank,'constant')) ./ ...
+            (sum(detrend(xrank,'constant').^2).*sum(detrend(yrank,'constant').^2)).^(1/2);
+        for c=1:size(X,2)
+            b = pinv([xrank(:,c) ones(n,1)])*yrank(:,c);
+            slope(B,c) = b(1); intercept(B,c) = b(2,:);
         end
     end
     

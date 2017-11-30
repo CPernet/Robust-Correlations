@@ -44,7 +44,7 @@ if r == 1 && c > 1
 elseif r > 1 && c > 1
     error('X and Y must be 2 vectors, more than 1 column/row detected')
 end
-% [X,Y]=pairwise_cleanup(X,Y);
+
 level = 5/100;
 
     

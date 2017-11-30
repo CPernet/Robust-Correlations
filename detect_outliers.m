@@ -77,7 +77,6 @@ if numel(X) ~= numel(Y)
     error('vector must be of the same length')
 end
 
-[X,Y]=pairwise_cleanup(X,Y);
 [n,p]=size(X);
 
 %% ------------------------------------------------------------------
