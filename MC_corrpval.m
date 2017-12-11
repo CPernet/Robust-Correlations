@@ -1,4 +1,4 @@
-function [r_alpha,t_alpha,p_alpha,vv,vvv,v] = MC_corrpval(n,p,method,alphav,pairs,D)
+function [r_alpha,t_alpha,p_alpha,v,vv,vvv] = MC_corrpval(n,p,method,alphav,pairs,D)
 
 % function to compute the alpha quantile estimate of the distribution of
 % minimal p-values under the null of correlations in a n*p matrix with null
@@ -23,7 +23,7 @@ function [r_alpha,t_alpha,p_alpha,vv,vvv,v] = MC_corrpval(n,p,method,alphav,pair
 %% deal with inputs
 if nargin == 0
     help MC_corrpval
-    elsie nargin < 2
+elseif nargin < 2
     error('at least 2 inputs requested see help MC_corrpval');
 end
 
@@ -31,7 +31,7 @@ if ~exist('pairs','var') || isempty(pairs)
     pairs = nchoosek([1:p],2);
 end
 
-if ~exist('alphav','var')
+if ~exist('alphav','var') || isempty(alphav)
     alphav = 5/100;
 end
 
@@ -47,39 +47,47 @@ end
 
 %% run the Monte Carlo simulation and keep smallest p values
 v = NaN(1,1000);
+vv = v; vvv = vv;
+
 parfor MC = 1:1000
     fprintf('Running Monte Carlo %g\n',MC)
     MVN = mvnrnd(zeros(1,p),SIGMA,n); % a multivariate normal distribution
     if strcmp(method,'Pearson')
-        [~,~,pval] = Pearson(MVN,pairs);
+        [r,t,pval] = Pearson(MVN,pairs);
     elseif strcmp(method,'Pearson')
-        [~,~,pval] = Spearman(MVN,pairs);
+        [r,t,pval] = Spearman(MVN,pairs);
     elseif strcmp(method,'Skipped Pearson')
-        [r,t,pval] = skipped_Pearson(MVN,pairs);
+        [r,t,~,pval] = skipped_Pearson(MVN,pairs);
     elseif strcmp(method,'Skipped Spearman')
         [r,t,pval] = skipped_Spearman(MVN,pairs);
     end
-    v(MC)   = min(pval);
-    vv(MC)  = max(r);
-    vvv(MC) = max(t);
+    
+    v(MC)   = max(r);
+    vv(MC)  = max(t);
+    vvv(MC) = min(pval);
+    
 end
 
 %% get the Harell-Davis estimate of the alpha quantile
     n       = length(v);
 for l=1:length(alphav)
-    q       = alphav(l)*10;  % for a decile
+    q       = 1-alphav(l);  % for r/t use 1-alphav
     m1      = (n+1).*q;
     m2      = (n+1).*(1-q);
     vec     = 1:n;
     w       = betacdf(vec./n,m1,m2)-betacdf((vec-1)./n,m1,m2);
     y       = sort(v);
-    p_alpha(l) = sum(w(:).*y(:));
-    y       = sort(vv);
     r_alpha(l) = sum(w(:).*y(:));
-    y       = sort(vvv);
+    y       = sort(vv);
     t_alpha(l) = sum(w(:).*y(:));
+    
+    q       = alphav(l);  % for p values use alphav
+    m1      = (n+1).*q;
+    m2      = (n+1).*(1-q);
+    vec     = 1:n;
+    w       = betacdf(vec./n,m1,m2)-betacdf((vec-1)./n,m1,m2);
+    y       = sort(vvv);
+    p_alpha(l) = sum(w(:).*y(:));
 end
 
-% For p=6, n=20 alpha =.05 .025 .01 get
-% 0.01122045  0.004343809 0.002354744
-% 0.0240      0.0069      0.000027
+
