@@ -4,11 +4,12 @@ function [r_alpha,t_alpha,p_alpha,v,vv,vvv] = MC_corrpval(n,p,method,alphav,pair
 % minimal p-values under the null of correlations in a n*p matrix with null
 % covariance but variance D (I by default)
 %
-% FORMAT p_alpha = MC_corrpval(n,p,D)
+% FORMAT p_alpha = MC_corrpval(n,p,method,alphav,pairs,D)
 %
 % INPUT n the number of observations
 %       p the number of variables
 %       method can be 'Pearson', 'Spearman', 'Skipped Pearson', 'Skipped Spearman'
+%       alphav the alpha value
 %       pairs a m*2 matrix of variables to correlate (optional)
 %       D the variance of each variable (optional)
 %
