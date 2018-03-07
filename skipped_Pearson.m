@@ -1,4 +1,4 @@
-function [rp,tp,CI,pval,outid,h]=skipped_Pearson(varargin)
+function [rp,tp,pval,h,CI,outid]=skipped_Pearson(varargin)
 
 % performs a robust Pearson correlation on data cleaned up for bivariate outliers,
 % that is after finding the central point in the distribution using the mid covariance
@@ -92,7 +92,7 @@ end
 boot_index = 1;
 while boot_index <= nboot
     resample = randi(n,n,1);
-    if length(unique(resample)) > 3 % at least 3 different data points
+    if length(unique(resample)) > p % always more observations than variables
         boostrap_sampling(:,boot_index) = resample;
         boot_index = boot_index +1;
     end
@@ -153,7 +153,7 @@ end
 
 
 %% once we have all the r and t values, we need to adjust for multiple comparisons
-if nargout == 6
+if nargout > 3
     if strcmp(method,'ECP')
         if exist('p_alpha','var')
             h = pval < p_alpha;
@@ -163,20 +163,19 @@ if nargout == 6
         end
     elseif strcmp('method','Hochberg')
         [sorted_pval,index] = sort(pval,'descend');
-        [~,reversed_index]=sort(index);
-        k = 1; sig = 0; h = zeros(1,p);
+        k = 1; sig = 0; h = zeros(1,length(pval));
         while sig == 0
-            if sorted_pval(k) <= alphav/k
+            if sorted_pval(k) < alphav/k
                 h(k:end) = 1; sig = 1;
             else
                 k = k+1;
             end
         end
-        h = h(reversed_index);
-        
-        %% quick clean-up of individual p-values
-        pval(pval==0) = 1/nboot;end
-    
+        h = h(index);
+    end
 end
+
+%% quick clean-up of individual p-values
+pval(pval==0) = 1/nboot;
 
 disp('Skipped Pearson done')
