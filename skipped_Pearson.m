@@ -1,11 +1,11 @@
-function [rp,tp,pval,h,CI,outid]=skipped_Pearson(varargin)
+function [rs,ts,CI,pval,outid,h]=skipped_Pearson(varargin)
 
-% performs a robust Pearson correlation on data cleaned up for bivariate outliers,
+% performs a robust Spearman correlation on data cleaned up for bivariate outliers,
 % that is after finding the central point in the distribution using the mid covariance
 % determinant, orthogonal distances are computed to this point, and any data outside the
 % bound defined by the idealf estimator of the interquartile range is removed.
 %
-% FORMAT: [r,t,p,h,CI,outid] = skipped_Pearson(X,pairs,method,alphav,p_alpha);
+% FORMAT: [rp,tp,CI,pval,outid,h]=skipped_Spearman(X,pairs,method,alphav,p_alpha);
 %
 % INPUTS:  X is a matrix and corelations between all pairs (default) are computed
 %          pairs (optional) is a n*2 matrix of pairs of column to correlate
@@ -14,13 +14,13 @@ function [rp,tp,pval,h,CI,outid]=skipped_Pearson(varargin)
 %          p_alpha (optional) the critical p_value to correct for multiple
 %                  comparisons (see MC_corrpval)
 %
-% OUTPUTS: r is the pearson/spearman correlation
-%          t is the T value associated to the skipped correlation
-%          p is the p value of that pair
-%          h is the significance after correction for multiple comparisons
-%          CI is the robust confidence interval computed by bootstrapping the
-%             cleaned-up data set and taking the .95 centile values
+% OUTPUTS: rs is the Spearman correlation
+%          ts is the T value associated to the skipped correlation
+%          CI is the robust confidence interval of r computed by bootstrapping 
+%             the cleaned-up data set and taking the alphav centile values
+%          pval is the p value associated to t
 %          outid is the index of bivariate outliers
+%          h is the significance after correction for multiple comparisons
 %
 % This code rely on the mid covariance determinant as implemented in LIBRA
 % - Verboven, S., Hubert, M. (2005), LIBRA: a MATLAB Library for Robust Analysis,
