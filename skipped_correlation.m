@@ -1,24 +1,26 @@
 function [r,t,h,outid,hboot,CI]=skipped_correlation(x,y,fig_flag)
-
-% performs a robust correlation using pearson/spearman correlation on
+%SKIPPED_CORRELATION Pearson or Spearman correlation after bivariate
+%outlier removal
+%
+% Perform a robust correlation using pearson/spearman correlation on
 % data cleaned up for bivariate outliers - that is after finding the
 % central point in the distribution using the mid covariance determinant,
 % orthogonal distances are computed to this point, and any data outside the
 % bound defined by the idealf estimator of the interquartile range is removed.
 % 
 % FORMAT:
-%          [r,t,h] = skipped_correlation(X);
-%          [r,t,h] = skipped_correlation(X,fig_flag);
-%          [r,t,h,outid,hboot,CI] = skipped_correlation(X,Y,fig_flag);
+%          [r,t,h] = skipped_correlation(x,y);
+%          [r,t,h] = skipped_correlation(x,y,fig_flag);
+%          [r,t,h,outid,hboot,CI] = skipped_correlation(x,y,fig_flag);
 %
-% INPUTS:  X is a matrix and corelations between all pairs (default) are computed
-%          pairs (optional) is a n*2 matrix of pairs of column to correlate  
-%          fig_flag (optional, ( by default) indicates to plot the data or not
+% INPUTS:  x and y are matrices and correlations are computed between all pairs
+%          fig_flag (optional), indicates to plot the data or not [0/1] -
+%          default = 1
 %
 % OUTPUTS:
 %          r is the pearson/spearman correlation 
-%          t is the T value associated to the skipped correlation
-%          h is the hypothesis of no association at alpha = 5% 
+%          t is the T value associated with the skipped correlation
+%          h is the hypothesis of no association at alpha = 5 % 
 %          outid is the index of bivariate outliers
 % 
 %          optional:
@@ -38,7 +40,7 @@ function [r,t,h,outid,hboot,CI]=skipped_correlation(x,y,fig_flag)
 % i.e. ((number of observations + number of variables*2)+1) / 2, 
 % thus for a correlation this is floor(n/2 + 5/2).
 %
-% See also MCDCOV, IDEALF.
+% See also MCDCOV, IDEALF, skipped_Spearman, skipped_Pearson.
 
 % Cyril Pernet & Guillaume Rousselet, v1 - April 2012
 % ---------------------------------------------------
@@ -58,13 +60,13 @@ end
 if size(x,1) == 1 && size(x,2) > 1; x = x'; end
 if size(y,1) == 1 && size(y,2) > 1; y = y'; end
 
-% if X a vector and Y a matrix, 
-% repmat X to perform multiple tests on Y (or the other around)
+% if x is a vector and y is a matrix, 
+% repmat x to perform multiple tests on y (or vice versa)
 
 % the default hypothesis is to test that all pairs of correlations are 0
 hypothesis = 1;  
 
-% now if x is a vector and we test multiple y (or the other way around) one
+% now if x is a vector and we test multiple y (or the other way round) one
 % has to adjust for this
 if size(x,2) == 1 && size(y,2) > 1
     x = repmat(x,1,size(y,2));
