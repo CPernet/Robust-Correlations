@@ -107,8 +107,8 @@ upper_bound = nboot - lower_bound;
 
 % place holders
 outid = cell(size(pairs,1),1);
-rp    = NaN(size(pairs,1),1);
-tp    = NaN(size(pairs,1),1);
+rs    = NaN(size(pairs,1),1);
+ts    = NaN(size(pairs,1),1);
 CI    = NaN(size(pairs,1),2);
 pval  = NaN(size(pairs,1),1);
 
