@@ -5,6 +5,8 @@
 %% COMPARE_CORR_IND
 %% =======================================================================
 %% GENERATE DATA
+% Two variables from 2 independent groups: the variables are correlated
+% independently in each group and the correlations compared.
 rng(21)
 n1 = 100;
 mu1 = 1;
@@ -17,6 +19,10 @@ sigma2 = 1;
 r2 = 0.5;
 data2 = (mu2 + sigma2*randn(n2,2)) * chol([1 r2; r2 1]);
 [R1, R2, D, CI, DIST] = compare_corr_ind(data1, data2, 'Spearman');
+% [R1, R2, D, CI, DIST] = compare_corr_ind(data1, data2, 'Pearson');
+% [R1, R2, D, CI, DIST] = compare_corr_ind(data1, data2, 'bendcorr');
+% [R1, R2, D, CI, DIST] = compare_corr_ind(data1, data2, 'Skipped_P');
+% [R1, R2, D, CI, DIST] = compare_corr_ind(data1, data2, 'Skipped_S');
 
 %% ILLUSTRATE 2 GROUPS
 figure('Color','white', 'NumberTitle', 'off')
@@ -61,6 +67,8 @@ hold off
 %% COMPARE_CORR_DEP: OVERLAPPING CASE
 %% =======================================================================
 %% GENERATE DATA
+% Three variables from 1 group: variable 1 is correlated with variable 2
+% and variable 3 and the correlations are compared.
 rng(2)
 Np = 100; % sample size / number of participants
 a = randn(Np,1);
@@ -68,6 +76,9 @@ b = a * .1 + rand(Np,1);
 c = a * .4 + rand(Np,1);
 data = [a b c];
 [R1, R2, D, CI, DIST] = compare_corr_dep(data, 'Spearman');
+% [R1, R2, D, CI, DIST] = compare_corr_dep(data, 'bendcorr');
+% [R1, R2, D, CI, DIST] = compare_corr_dep(data, 'Skipped_P');
+% [R1, R2, D, CI, DIST] = compare_corr_dep(data, 'Skipped_S');
 
 %% ILLUSTRATE 2 CORRELATIONS
 figure('Color','white', 'NumberTitle', 'off')
@@ -112,6 +123,8 @@ hold off
 %% COMPARE_CORR_DEP: NON-OVERLAPPING CASE
 %% =======================================================================
 %% GENERATE DATA
+% Two variables from 1 group but measured in 2 occasions: variable 1 is correlated with variable 2
+% independently in each occasion and the correlations are compared.
 rng(2)
 Np = 100; % sample size / number of participants
 a1 = randn(Np,1);
@@ -120,6 +133,9 @@ a2 = a1 + rand(Np,1);
 b2 = a2 * .2 + rand(Np,1);
 data = [a1 b1 a2 b2];
 [R1, R2, D, CI, DIST] = compare_corr_dep(data, 'Spearman');
+% [R1, R2, D, CI, DIST] = compare_corr_dep(data, 'bendcorr');
+% [R1, R2, D, CI, DIST] = compare_corr_dep(data, 'Skipped_P');
+% [R1, R2, D, CI, DIST] = compare_corr_dep(data, 'Skipped_S');
 
 %% ILLUSTRATE 2 CORRELATIONS
 figure('Color','white', 'NumberTitle', 'off')
