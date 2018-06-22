@@ -7,8 +7,8 @@ function [rs,ts,CI,pval,outid,h]=skipped_Spearman(varargin)
 %
 % FORMAT: [rp,tp,CI,pval,outid,h]=skipped_Spearman(X,pairs,method,alphav,p_alpha);
 %
-% INPUTS:  X is a matrix and corelations between all pairs (default) are computed
-%          pairs (optional) is a n*2 matrix of pairs of column to correlate
+% INPUTS:  X is a matrix and correlations between all pairs (default) are computed
+%          pairs (optional) is a n*2 matrix of pairs of columns to correlate
 %          method (optional) is 'ECP' or 'Hochberg' (only for n>60)
 %          alphav (optional, 5% by default) is the requested alpha level
 %          p_alpha (optional) the critical p_value to correct for multiple
