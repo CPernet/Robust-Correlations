@@ -131,15 +131,22 @@ elseif strcmp(method,names{3})
     boot_r2 = bendcorr(X2,Y2,0);
     
 else
-    if strcmp(method,names{4}), estimator = 'Pearson';
-    else
-        estimator = 'Spearman';
+    pairs = zeros(599,2); % define columns to compare
+    pairs(:,1) = 1:599;
+    pairs(:,2) = pairs(:,1) + 599;
+    if strcmp(method,names{4}) % Pearson
+        R1 = skipped_Pearson([data1(:,1),data1(:,2)]);
+        R2 = skipped_Pearson([data2(:,1),data2(:,2)]);
+        boot_r1 = skipped_Pearson([X1,Y1],pairs);
+        boot_r2 = skipped_Pearson([X2,Y2],pairs);
+    else % Spearman
+        R1 = skipped_Spearman([data1(:,1),data1(:,2)]);
+        R2 = skipped_Spearman([data2(:,1),data2(:,2)]);
+        boot_r1 = skipped_Spearman([X1,Y1],pairs);
+        boot_r2 = skipped_Spearman([X2,Y2],pairs);
     end
-    R1 = skipped_correlation(data1(:,1),data1(:,2),0,estimator);
-    R2 = skipped_correlation(data2(:,1),data2(:,2),0,estimator);
     D =  R1 - R2;
-    boot_r1 = skipped_correlation(X1,Y1,0,estimator);
-    boot_r2 = skipped_correlation(X2,Y2,0,estimator);
+    
 end
 
 d = sort(boot_r1 - boot_r2);
