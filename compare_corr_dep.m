@@ -101,17 +101,23 @@ switch type
             boot_r2 = bendcorr(X1,Y2,0);
             
         else
-            if strcmp(method,names{3}), estimator = 'Pearson';
-            else
-                estimator = 'Spearman'; 
+            pairs = zeros(599,2); % define columns to compare
+            pairs(:,1) = 1:599;
+            pairs(:,2) = pairs(:,1) + 599;
+            if strcmp(method,names{3}) % Skipped Pearson
+                R1 = skipped_Pearson([data(:,1),data(:,2)]);
+                R2 = skipped_Pearson([data(:,1),data(:,3)]);
+                boot_r1 = skipped_Pearson([X1,Y1],pairs);
+                boot_r2 = skipped_Pearson([X1,Y2],pairs);
+            else % Skipped Spearman
+                R1 = skipped_Spearman([data(:,1),data(:,2)]);
+                R2 = skipped_Spearman([data(:,1),data(:,3)]);
+                boot_r1 = skipped_Spearman([X1,Y1],pairs);
+                boot_r2 = skipped_Spearman([X1,Y2],pairs);
             end
-            R1 = skipped_correlation(data(:,1),data(:,2),0,estimator);
-            R2 = skipped_correlation(data(:,1),data(:,3),0,estimator);
-            D = R1 - R2;
-            boot_r1 = skipped_correlation(X1,Y1,0,estimator);
-            boot_r2 = skipped_correlation(X1,Y2,0,estimator);
+            D =  R1 - R2;
         end
-        
+             
     case {2}  % non-overlap case
         % boostrap data
         n1 = size(data,1); table1 = randi(n1,n1,599);
@@ -133,15 +139,21 @@ switch type
             boot_r1 = bendcorr(X1,Y1,0);
             boot_r2 = bendcorr(X2,Y2,0);
         else
-            if strcmp(method,names{3}), estimator = 'Pearson';
-            else
-                estimator = 'Spearman'; 
+            pairs = zeros(599,2); % define columns to compare
+            pairs(:,1) = 1:599;
+            pairs(:,2) = pairs(:,1) + 599;
+            if strcmp(method,names{3}) % Skipped Pearson
+                R1 = skipped_Pearson([data(:,1),data(:,2)]);
+                R2 = skipped_Pearson([data(:,3),data(:,4)]);
+                boot_r1 = skipped_Pearson([X1,Y1],pairs);
+                boot_r2 = skipped_Pearson([X2,Y2],pairs);
+            else % Skipped Spearman
+                R1 = skipped_Spearman([data(:,1),data(:,2)]);
+                R2 = skipped_Spearman([data(:,3),data(:,4)]);
+                boot_r1 = skipped_Spearman([X1,Y1],pairs);
+                boot_r2 = skipped_Spearman([X2,Y2],pairs);
             end
-            R1 = skipped_correlation(data(:,1),data(:,2),0,estimator);
-            R2 = skipped_correlation(data(:,3),data(:,4),0,estimator);
-            D = R1 - R2;
-            boot_r1 = skipped_correlation(X1,Y1,0,estimator);
-            boot_r2 = skipped_correlation(X2,Y2,0,estimator);
+            D =  R1 - R2;
         end
 end
 
