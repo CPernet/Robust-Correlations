@@ -1,5 +1,6 @@
 function [rs,ts,CI,pval,outid,h]=skipped_Spearman(varargin)
-
+%SKIPPED_SPEARMAN Spearman correlation after bivariate outlier removal
+%
 % performs a robust Spearman correlation on data cleaned up for bivariate outliers,
 % that is after finding the central point in the distribution using the mid covariance
 % determinant, orthogonal distances are computed to this point, and any data outside the
