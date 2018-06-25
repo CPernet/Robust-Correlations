@@ -170,7 +170,8 @@ if nargout == 6
             h = pval < p_alpha;
         else
             disp('ECP method requested, computing p alpha ... (takes a while)')
-            p_alpha = MC_corrpval(n,p,'Skipped Pearson',alphav,pairs);
+            p_alpha = MC_corrpval(n,p,'Skipped Spearman',alphav,pairs);
+            h = pval < p_alpha;
         end
     elseif strcmp(method,'Hochberg')
         [sorted_pval,index] = sort(pval,'descend');
@@ -181,6 +182,9 @@ if nargout == 6
                 h(k:end) = 1; sig = 1;
             else
                 k = k+1;
+                if k == length(h)
+                    break
+                end
             end
         end
         h = h(reversed_index);

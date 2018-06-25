@@ -164,9 +164,7 @@ if fig_flag ~= 0
     
     if strcmp(answer,'yes')
         for f = 1:p
-            if fig_flag == 1
-                figure('Color','w','Name',[num2str(f) ' Spearman correlation'])
-            end
+            figure('Color','w','Name',[num2str(f) ' Spearman correlation'])
             
             if nargout >3
                 subplot(1,2,1);
