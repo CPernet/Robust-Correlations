@@ -1,22 +1,23 @@
-function [rs,ts,CI,pval,outid,h]=skipped_Pearson(varargin)
-
-% performs a robust Spearman correlation on data cleaned up for bivariate outliers,
+function [rp,tp,CI,pval,outid,h]=skipped_Pearson(varargin)
+%SKIPPED_PEARSON Pearson correlation after bivariate outlier removal
+%
+% Performs a robust Pearson correlation on data cleaned up for bivariate outliers,
 % that is after finding the central point in the distribution using the mid covariance
 % determinant, orthogonal distances are computed to this point, and any data outside the
 % bound defined by the idealf estimator of the interquartile range is removed.
 %
-% FORMAT: [rp,tp,CI,pval,outid,h]=skipped_Spearman(X,pairs,method,alphav,p_alpha);
+% FORMAT: [rp,tp,CI,pval,outid,h]=skipped_Pearson(X,pairs,method,alphav,p_alpha);
 %
-% INPUTS:  X is a matrix and corelations between all pairs (default) are computed
-%          pairs (optional) is a n*2 matrix of pairs of column to correlate
+% INPUTS:  X is a matrix and correlations between all pairs (default) are computed
+%          pairs (optional) is a n*2 matrix of pairs of columns to correlate
 %          method (optional) is 'ECP' or 'Hochberg' (only for n>60)
 %          alphav (optional, 5% by default) is the requested alpha level
 %          p_alpha (optional) the critical p_value to correct for multiple
 %                  comparisons (see MC_corrpval)
 %
-% OUTPUTS: rs is the Spearman correlation
-%          ts is the T value associated to the skipped correlation
-%          CI is the robust confidence interval of r computed by bootstrapping 
+% OUTPUTS: rp is the Pearson correlation
+%          tp is the T value associated to the skipped correlation
+%          CI is the robust confidence interval of r computed by bootstrapping
 %             the cleaned-up data set and taking the alphav centile values
 %          pval is the p value associated to t
 %          outid is the index of bivariate outliers
@@ -89,31 +90,39 @@ end
 %% start the algorithm
 
 % _create a table of resamples_
-boot_index = 1;
-while boot_index <= nboot
-    resample = randi(n,n,1);
-    if length(unique(resample)) > p % always more observations than variables
-        boostrap_sampling(:,boot_index) = resample;
-        boot_index = boot_index +1;
-    end
+if nargout > 2
+  boot_index = 1;
+  while boot_index <= nboot
+      resample = randi(n,n,1);
+      if length(unique(resample)) > p % always more observations than variables
+          boostrap_sampling(:,boot_index) = resample;
+          boot_index = boot_index +1;
+      end
+  end
+  lower_bound = round((alphav*nboot)/2);
+  upper_bound = nboot - lower_bound;
 end
-lower_bound = round((alphav*nboot)/2);
-upper_bound = nboot - lower_bound;
 
 % now for each pair to test, get the observed and boostrapped r and t
 % values, then derive the p value from the bootstrap (and hboot and CI if
 % requested)
 
 % place holders
-outid = cell(size(pairs,1),1);
-rp    = NaN(size(pairs,1),1);
-tp    = NaN(size(pairs,1),1);
-CI    = NaN(size(pairs,1),2);
-pval  = NaN(size(pairs,1),1);
+rp = NaN(size(pairs,1),1);
+for outputs = 2:nargout
+    if outputs == 2
+    tp    = NaN(size(pairs,1),1);
+elseif outputs == 3
+    CI = NaN(size(pairs,1),2);
+elseif outputs == 4
+    pval  = NaN(size(pairs,1),1);
+elseif outputs == 5
+    outid = cell(size(pairs,1),1);
+end
 
 % loop for each pair to test
 for row = 1:size(pairs,1)
-    
+
     % select relevant columns
     X = [x(:,pairs(row,1)) x(:,pairs(row,2))];
     % get the bivariate outliers
@@ -126,12 +135,12 @@ for row = 1:size(pairs,1)
         outid{row}=vec(flag);
     end
     keep=vec(~flag); % the vector of data to keep
-    
+
     % Pearson correlation on cleaned data
     rp(row) = sum(detrend(X(keep,1),'constant').*detrend(X(keep,2),'constant')) ./ ...
         (sum(detrend(X(keep,1),'constant').^2).*sum(detrend(X(keep,2),'constant').^2)).^(1/2);
     tp(row) = rp(row)*sqrt((n-2)/(1-rp(row).^2));
-    
+
     if nargout > 2
         % redo this for bootstrap samples
         % fprintf('computing p values by bootstrapping data, pair %g %g\n',pairs(row,1),pairs(row,2))
@@ -140,11 +149,11 @@ for row = 1:size(pairs,1)
             r(b) = sum(detrend(Xb(keep,1),'constant').*detrend(Xb(keep,2),'constant')) ./ ...
                 (sum(detrend(Xb(keep,1),'constant').^2).*sum(detrend(Xb(keep,2),'constant').^2)).^(1/2);
         end
-        
+
         % get the CI
         r = sort(r);
         CI(row,:) = [r(lower_bound) r(upper_bound)];
-        
+
         % get the p value
         Q = sum(r<0)/nboot;
         pval(row) = 2*min([Q 1-Q]);
