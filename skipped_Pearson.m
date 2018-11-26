@@ -34,6 +34,12 @@ function [rp,tp,CI,pval,outid,h]=skipped_Pearson(varargin)
 % i.e. ((number of observations + number of variables*2)+1) / 2,
 % thus for a correlation this is floor(n/2 + 5/2).
 %
+% The method for multiple comparisons correction is described in
+% Rand R. Wilcox, Guillaume A. Rousselet & Cyril R. Pernet (2018) 
+% Improved methods for making inferences about multiple skipped correlations, 
+% Journal of Statistical Computation and Simulation, 88:16, 3116-3131, 
+% DOI: 10.1080/00949655.2018.1501051
+%
 % See also MCDCOV, IDEALF.
 %
 % Cyril Pernet v3 - Novembre 2017
