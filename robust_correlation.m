@@ -1,19 +1,25 @@
 function results = robust_correlation(X,Y)
 
-% general function that performs multiple tests on X and Y
+% General function that performs multiple tests on X and Y.
 %
-% FORMAT results = robust_correlation(X,Y)
+% FORMAT:  results = robust_correlation(X,Y)
 % 
-% INPUT  X and Y are twom vector of the same length
+% INPUTS:  X and Y are two vectors of the same length.
 %
-% OUTPUT result is a structure with the field indicating the output of the
-% different tests performed - in particular the function 
-% 1 - plot the data and generate univariate and bivariate histograms
-% 2 - performs the Henze- Zirkler test for normality (results.normality)
-% 3 - computes conditional data and variances (results.conditional)
-% 4 - test for heteroscedasticity based on conditional variances (results.heteroscedasticity)
-% 5 - check for outliers (results.outliers)
-% 5 - performs Pearson, Spearman, Bend and Skipped correlations 
+% OUTPUTS: 
+%          result is a structure with one field for each output from the
+%          different tests performed. 
+%          In particular the function: 
+%
+%   1 - plots the data and generates univariate and bivariate histograms;
+%   2 - performs the Henze-Zirkler test for normality (results.normality);
+%   3 - computes conditional data and variances (results.conditional);
+%   4 - tests for heteroscedasticity based on conditional variances
+%     (results.heteroscedasticity);
+%   5 - checks for outliers (results.outliers);
+%   6 - performs Pearson, Spearman, Bend and Skipped correlations.
+%
+% See also HZMVNTEST, CONDITIONAL, PEARSON, SPEARMAN, DETECT_OUTLIERS, BENDCORR, SKIPPED_CORRELATION. 
 %
 % Cyril Pernet v1
 % ---------------------------------
@@ -69,7 +75,7 @@ disp(' ')
 fprintf('heteroscedasticity testing indicates that %s\n',results.heteroscedasticity.result)
 fprintf('conditional variances = %g %g \n', results.conditional.variances)
 
-%% 5 - check for outliers based on the MAD estimators
+%% 5 - check for outliers based on the MAD median rule & the IQR rule
 results.outliers = detect_outliers(X,Y);
 
 %% 6 - Pearson correlation

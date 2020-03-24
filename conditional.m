@@ -1,16 +1,17 @@
 function [values,variance]=conditional(X,Y)
 
-% returns the conditional values and variance of X given Y and Y given X
-% based on Pearson correlation values because if r = 0 data are independent
-% (assuming they are jointly normal)
+% Returns the conditional values and variances of X given Y and Y given X.
+% The calculation is based on Pearson correlation values because 
+% if the X & Y are jointly normal and r = 0, then X & Y are independent.
 %
-% FORMAT [values,variance]=conditional(X,Y)
+% FORMAT:  [values,variance]=conditional(X,Y)
 %
-% INPUTS x and y are two vectors of the same length
+% INPUTS:  X and Y are two vectors of the same length
 %
-% OUTPUTS values are the conditioned variables X and Y
-%         variances are the conditional variances
+% OUTPUTS: values are the conditioned variables X and Y
+%          variances are the conditional variances
 %
+
 % Cyril Pernet v1 21/05/2012
 % ---------------------------------
 %  Copyright (C) Corr_toolbox 2012

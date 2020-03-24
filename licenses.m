@@ -1,4 +1,4 @@
-% list the licenses for the files included in the correlation toolbox
+% Licenses for the files included in the correlation toolbox
 
 %% Correlation toolbox - GNU General Public License 
 % Corr_toolbox is a matlab toolbox intended for the visualization and robust 
