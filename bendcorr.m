@@ -2,27 +2,27 @@ function [r,t,p,hboot,CI,H,pH] = bendcorr(X,Y,fig_flag,beta)
 
 % Computes the percentage bend correlation along with the bootstrap CI
 %
-% FORMAT:  [r,t,p] = bendcorr(X,Y)
-%          [r,t,p,hboot,CI,H,pH] = bendcorr(X,Y,fig_flag,beta)
+% FORMAT: [r,t,p] = bendcorr(X,Y)
+%         [r,t,p,hboot,CI,H,pH] = bendcorr(X,Y,fig_flag,beta)
 %
-% INPUTS:  X and Y are 2 vectors or matrices. In the latter case,
-%          correlations are computed column-wise. 
-%          fig_flag indicates to plot (1 - default) the data or not (0)
-%          beta represents the amount of trimming: 0 <= beta <= 0.5
-%          (beta is also called the bending constant for omega - default = 0.2)
+% INPUT: X and Y are 2 vectors or matrices, in the latter case,
+%        correlations are computed column-wise 
+%        fig_flag indicates to plot (1 - default) the data or not (0)
+%        beta represents the amount of trimming for outliers with 0 <= B <=.5
+%        (actually the bending constant for omega - default = 20%)
 %
-% OUTPUTS: r is the percentage bend correlation
-%          t is the associated t value
-%          pval is the corresponding p value
-%          hboot 1/0 declares the test significant based on CI
-%          CI is the percentile bootstrap confidence interval
-%          H is the measure of association between all pairs
-%          pH is the p value for an omnibus test of independence between all pairs 
+% OUTPUT: r is the percentage bend correlation
+%         t is the associated t value
+%         pval is the corresponding p value
+%         hboot 1/0 declares the test significant based on CI
+%         CI is the percentile bootstrap confidence interval
+%         H = the measure of association between all pairs
+%         pH = the p value for an omnibus test of independence between all pairs 
 %
 % The percentage bend correlation is a robust method that protects against
-% outliers among the marginal distributions.
-
-% Cyril Pernet and Guillaume Rousselet 26-01-2011
+% outliers among the marginal distributions
+%
+% Cyril Pernet and Guillaume Rousselt 26-01-2011
 % Reformatted for Corr_toolbox 02--7-2012 
 % ----------------------------------------------
 %  Copyright (C) Corr_toolbox 2012
@@ -132,7 +132,7 @@ if fig_flag ~= 0
         answer = questdlg('plots all correlations','Plotting option','yes','no','yes');
     else
         if fig_flag == 1
-            figure('Name','Bend correlation');
+            figure('Name','boostrapped Bend correlation');
             set(gcf,'Color','w');
         end
         
@@ -154,7 +154,6 @@ if fig_flag ~= 0
         coef = pinv([X(:,1) ones(n,1)])*X(:,2);
         s = r / (std(X(:,1))/std(X(:,2)));
         h = refline(s,coef(2)); set(h,'Color','r','LineWidth',4);
-        box on;set(gca,'FontSize',14)
         
         if  nargout>3
             if sum(slope == 0) == 0
@@ -167,16 +166,15 @@ if fig_flag ~= 0
                 filled=[[y1.YData(1):step1:y1.YData(2)],[y2.YData(2):-step2:y2.YData(1)]];
                 hold on; fillhandle=fill(xpoints,filled,[1 0 0]);
                 set(fillhandle,'EdgeColor',[1 0 0],'FaceAlpha',0.2,'EdgeAlpha',0.8);%set edge color
-                box on;set(gca,'FontSize',14)
+                box on;
             end
             
             subplot(1,2,2); k = round(1 + log2(length(rb))); hist(rb,k); grid on;
-            title({'Bootstrapped correlations';['h=' num2str(hboot)]},'FontSize',16); hold on
+            title(['Bootstrapped correlations h=' num2str(hboot)],'FontSize',16); hold on
             xlabel('boot correlations','FontSize',14);ylabel('frequency','FontSize',14)
             plot(repmat(CI(1),max(hist(rb,k)),1),[1:max(hist(rb,k))],'r','LineWidth',4);
             plot(repmat(CI(2),max(hist(rb,k)),1),[1:max(hist(rb,k))],'r','LineWidth',4);
             axis tight; colormap([.4 .4 1])
-            box on;set(gca,'FontSize',14,'Layer','Top')
         end
     end
     
@@ -205,7 +203,6 @@ if fig_flag ~= 0
             coef = pinv([X(:,f) ones(n,1)])*X(:,f+size(X,2)/2);
             s = r(f) / (std(X(:,f))/std(X(:,f+size(X,2)/2)));
             h = refline(s,coef(2)); set(h,'Color','r','LineWidth',4);
-            box on;set(gca,'FontSize',14,'Layer','Top')
             
             if nargout >3
                 if sum(slope(:,f) == 0) == 0
@@ -218,16 +215,15 @@ if fig_flag ~= 0
                     filled=[[y1.YData(1):step1:y1.YData(2)],[y2.YData(2):-step2:y2.YData(1)]];
                     hold on; fillhandle=fill(xpoints,filled,[1 0 0]);
                     set(fillhandle,'EdgeColor',[1 0 0],'FaceAlpha',0.2,'EdgeAlpha',0.8);%set edge color
-                    box on;set(gca,'FontSize',14,'Layer','Top')
+                    box on;
                 end
                 
                 subplot(1,2,2); k = round(1 + log2(size(rb,1))); hist(rb(:,f),k); grid on;
-                title({'Bootstrapped correlations';['h=',num2str(hboot(f))]},'FontSize',16); hold on
+                title(['Bootstrapped correlations h=' num2str(hboot(f))],'FontSize',16); hold on
                 xlabel('boot correlations','FontSize',14);ylabel('frequency','FontSize',14)
                 plot(repmat(CI(1,f),max(hist(rb(:,f),k)),1),[1:max(hist(rb(:,f),k))],'r','LineWidth',4);
                 plot(repmat(CI(2,f),max(hist(rb(:,f),k)),1),[1:max(hist(rb(:,f),k))],'r','LineWidth',4);
                 axis tight; colormap([.4 .4 1])
-                box on;set(gca,'FontSize',14,'Layer','Top')
             end
         end
     end

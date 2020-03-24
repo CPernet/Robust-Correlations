@@ -1,4 +1,0 @@
-robustcorrtool
-==============
-
-robust correlartion toolbox

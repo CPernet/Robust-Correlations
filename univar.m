@@ -1,9 +1,9 @@
 function [nu,x,h,xp,yp]=univar(data)
 
-% Computes the univariate pdf of data and the histogram values.
-% Returns the frequency of data per bin (nu), the position of the bins (x) 
-% and their size (h). The pdf is returned in yp for the xp values
-
+% compute the univariate pdf of data and the histogram values
+% returns the freq of data per bin (nu), the position of the bins (x) 
+% and their size (h), the pdf is returned in yp for the xp values
+%
 % Cyril Pernet v1
 % ---------------------------------
 %  Copyright (C) Corr_toolbox 2012

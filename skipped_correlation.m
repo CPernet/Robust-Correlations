@@ -4,27 +4,26 @@ function [r,t,h,outid,hboot,CI]=skipped_correlation(x,y,fig_flag)
 % data cleaned up for bivariate outliers - that is after finding the
 % central point in the distribution using the mid covariance determinant,
 % orthogonal distances are computed to this point, and any data outside the
-% bound defined by the idealf estimator of the interquartile range is removed.
+% bound defined by the MAD estimator is removed.
 % 
-% FORMAT:
-%          [r,t,h] = skipped_correlation(X);
-%          [r,t,h] = skipped_correlation(X,fig_flag);
-%          [r,t,h,outid,hboot,CI] = skipped_correlation(X,Y,fig_flag);
+% FORMAT
+% [r,t,h] = skipped_correlation(X,Y);
+% [r,t,h] = skipped_correlation(X,Y,fig_flag);
+% [r,t,h,outid,hboot,CI] = skipped_correlation(X,Y,fig_flag);
 %
-% INPUTS:  X is a matrix and corelations between all pairs (default) are computed
-%          fig_flag (optional, ( by default) indicates to plot the data or not
+% INPUT: X and Y are 2 vectors or matrices, in the latter case,
+%        correlations are computed column-wise 
+%        fig_flag (1/0) indicates to plot the data or not
 %
-% OUTPUTS:
-%          r is the pearson/spearman correlation 
-%          t is the T value associated to the skipped correlation
-%          h is the hypothesis of no association at alpha = 5% 
-%          outid is the index of bivariate outliers
-% 
-%          optional:
-%
-%          hboot 1/0 declares the test significant based on CI (h depends on t)
-%          CI is the robust confidence interval computed by bootstrapping the 
-%          cleaned-up data set and taking the .95 centile values
+% OUTPUT
+% r is the pearson/spearman correlation 
+% t is the T value associated to the skipped correlation
+% h is the hypothesis of no association at alpha = 5% 
+% outid is the index of bivariate outliers
+% optional
+% hboot 1/0 declares the test significant based on CI (h depends on t)
+% CI  is the robust confidence interval conputed by bootstrapping the 
+% cleaned-up data set and taking the .95 centile values
 %
 % This code rely on the mid covariance determinant as implemented in LIBRA
 % - Verboven, S., Hubert, M. (2005), LIBRA: a MATLAB Library for Robust Analysis,
@@ -32,13 +31,11 @@ function [r,t,h,outid,hboot,CI]=skipped_correlation(x,y,fig_flag)
 % - Rousseeuw, P.J. (1984), "Least Median of Squares Regression,"
 % Journal of the American Statistical Association, Vol. 79, pp. 871-881.
 % 
-% The quantile of observations whose covariance is minimized is 
-% floor((n+size(X,2)*2+1)/2)),
-% i.e. ((number of observations + number of variables*2)+1) / 2, 
-% thus for a correlation this is floor(n/2 + 5/2).
+% see also mcdcov
+% note the quantile of observations whose cov. is minumized equals floor((n+size(X,2)*2+1)/2))
+% ie ((number of observations + number of variables*2)+1) / 2 thus for a
+% correlation this is floor(n/2 + 5/2)
 %
-% See also MCDCOV, IDEALF.
-
 % Cyril Pernet & Guillaume Rousselet, v1 - April 2012
 % ---------------------------------------------------
 %  Copyright (C) Corr_toolbox 2012
@@ -92,11 +89,33 @@ for column = 1:p
         fprintf('skipped correlation: processing pair %g \n',column); 
     end
     
+    % get the centre of the bivariate distributions
     X = [x(:,column) y(:,column)];
-    % flag bivariate outliers
-    flag = bivariate_outliers(X);
-    % remove outliers
-    vec=1:n;           
+    result=mcdcov(X,'cor',1,'plots',0,'h',floor((n+size(X,2)*2+1)/2));
+    center = result.center;
+    flag = zeros(n,1);
+     
+    % orthogonal projection to the lines joining the center
+    % followed by outlier detection using mad median rule
+    
+    vec=1:n;
+    for i=1:n % for each row
+        dis=NaN(n,1);
+        B = (X(i,:)-center)';
+        BB = B.^2;
+        bot = sum(BB);
+        if bot~=0
+            for j=1:n
+                A = (X(j,:)-center)';
+                dis(j)= norm(A'*B/bot.*B); 
+            end
+            [outliers,value] = madmedianrule(dis,2);
+            record{i} = dis > (median(dis)+gval.*value);
+        end
+    end
+    
+    flag = sum(cell2mat(record),2); % if any point is flagged
+            
     if sum(flag)==0
         outid{column}=[];
     else
@@ -177,7 +196,7 @@ end
 
 
 %% bootstrap
-if nargout > 4
+if nargout > 3
     
     [n,p]=size(a);
     nboot = 1000;
@@ -197,25 +216,23 @@ if nargout > 4
         table = randi(length(a{column}),length(a{column}),nboot);
         
         for B=1:nboot
-            % do Spearman
-            tmp1 = a{column}; xrank = tiedrank(tmp1(table(:,B)),0);
-            tmp2 = b{column}; yrank = tiedrank(tmp2(table(:,B)),0);
-            rsb(B,column) = sum(detrend(xrank,'constant').*detrend(yrank,'constant')) ./ ...
-                (sum(detrend(xrank,'constant').^2).*sum(detrend(yrank,'constant').^2)).^(1/2);
-            % get regression lines for Spearman
-            coef = pinv([xrank ones(length(a{column}),1)])*yrank;
-            sslope(B,column) = coef(1); sintercept(B,column) = coef(2,:);
-            
-            if p == 1 % ie only 1 correlation thus Pearson is good too
-                rpb(B,column) = sum(detrend(tmp1(table(:,B)),'constant').*detrend(tmp2(table(:,B)),'constant')) ./ ...
-                    (sum(detrend(tmp1(table(:,B)),'constant').^2).*sum(detrend(tmp2(table(:,B)),'constant').^2)).^(1/2);
-                coef = pinv([tmp1(table(:,B)) ones(length(a{column}),1)])*tmp2(table(:,B));
-                pslope(B,column) = coef(1); pintercept(B,column) = coef(2,:);
-            end
+        % do Spearman
+        tmp1 = a{column}; xrank = tiedrank(tmp1(table(:,B)),0);
+        tmp2 = b{column}; yrank = tiedrank(tmp2(table(:,B)),0);
+        rsb(B,column) = sum(detrend(xrank,'constant').*detrend(yrank,'constant')) ./ ...
+            (sum(detrend(xrank,'constant').^2).*sum(detrend(yrank,'constant').^2)).^(1/2);
+        coef = pinv([xrank ones(length(a{column}),1)])*yrank;
+        sslope(B,column) = coef(1); sintercept(B,column) = coef(2,:);
+        
+        if p == 1 % ie only 1 correlation thus Pearson is good too
+            rpb(B,column) = sum(detrend(tmp1(table(:,B)),'constant').*detrend(tmp2(table(:,B)),'constant')) ./ ...
+                (sum(detrend(tmp1(table(:,B)),'constant').^2).*sum(detrend(tmp2(table(:,B)),'constant').^2)).^(1/2);
+            coef = pinv([tmp1(table(:,B)) ones(length(a{column}),1)])*tmp2(table(:,B));
+            pslope(B,column) = coef(1); pintercept(B,column) = coef(2,:);
+        end
         end
     end
     
-    % in all cases get CI for Spearman
     rsb = sort(rsb,1);
     sslope = sort(sslope,1);
     sintercept = sort(sintercept,1);
@@ -232,46 +249,45 @@ if nargout > 4
             CIsslope(:,c) = [sslope(adj_low(c),c) ; sslope(adj_high(c),c)];
             CIsintercept(:,c) = [sintercept(adj_low(c),c) ; sintercept(adj_high(c),c)];
         else
-            CI(:,c) = [NaN NaN]';
+            CI(:,c) = [NaN NaN];
             hboot(c) = NaN;
             CIsslope(:,c) = NaN;
             CIsintercept(:,c) = NaN;
         end
     end
     
-    CIpslope = CIsslope; % used in plot - unless only one corr was computed
-    
+    CIpslope = CIsslope; % used in plot
     % case only one correlation
     if p == 1
         rpb = sort(rpb,1);
         pslope = sort(pslope,1);
         pintercept = sort(pintercept,1);
-        
-        % CI and h
-        adj_nboot = nboot - sum(isnan(rpb));
-        adj_low = round((level*adj_nboot)/2);
-        adj_high = adj_nboot - adj_low;
-        
-        if adj_low>0
-            CIp = [rpb(adj_low) ; rpb(adj_high)];
-            hbootp(c) = (rpb(adj_low) > 0) + (rpb(adj_high) < 0);
-            CIpslope(:,c) = [pslope(adj_low) ; pslope(adj_high)];
-            CIpintercept(:,c) = [pintercept(adj_low) ; pintercept(adj_high)];
-        else
-            CIp = [NaN NaN];
-            hbootp(c) = NaN;
-            CIpslope(:,c) = NaN;
-            CIpintercept(:,c) = NaN;
-        end
-        
-        % update outputs
-        tmp = hboot; clear hboot;
-        hboot.Spearman = tmp;
-        hboot.Pearson = hbootp;
-        
-        tmp = CI; clear CI
-        CI.Spearman = tmp';
-        CI.Pearson = CIp';
+    
+    % CI and h
+    adj_nboot = nboot - sum(isnan(rpb));
+    adj_low = round((level*adj_nboot)/2);
+    adj_high = adj_nboot - adj_low;
+    
+    if adj_low>0
+        CIp = [rpb(adj_low) ; rpb(adj_high)];
+        hbootp(c) = (rpb(adj_low) > 0) + (rpb(adj_high) < 0);
+        CIpslope(:,c) = [pslope(adj_low) ; pslope(adj_high)];
+        CIpintercept(:,c) = [pintercept(adj_low) ; pintercept(adj_high)];
+    else
+        CIp = [NaN NaN];
+        hbootp(c) = NaN;
+        CIpslope(:,c) = NaN;
+        CIpintercept(:,c) = NaN;
+    end
+    
+    % update outputs
+    tmp = hboot; clear hboot;
+    hboot.Pearson = hbootp;
+    hboot.Spearman = tmp;
+    
+    tmp = CI; clear CI
+    CI.Pearson = CIp;
+    CI.Spearman = tmp;
     end
 end
     
@@ -286,7 +302,7 @@ if fig_flag ~= 0
             set(gcf,'Color','w');
         end
         
-        if nargout>4
+        if nargout>3
             if ~isnan(r.Pearson); subplot(1,3,1); end
             M = sprintf('Skipped correlation \n Pearson r=%g CI=[%g %g] \n Spearman r=%g CI=[%g %g]',r.Pearson,CI.Pearson(1),CI.Pearson(2),r.Spearman,CI.Spearman(1),CI.Spearman(2));
         else
@@ -316,9 +332,8 @@ if fig_flag ~= 0
         C = floor(min([MM(:,3);MM2(:,3)]) - min([MM(:,3);MM2(:,3)])*0.01);
         D = ceil(max([MM(:,4);MM2(:,4)]) + max([MM(:,4);MM2(:,4)])*0.01);
         axis([A B C D]);
-        box on;set(gca,'Fontsize',14)
         
-        if nargout>4 && sum(~isnan(CIpslope))==2
+        if nargout>3 && sum(~isnan(CIpslope))==2
             % add CI
             y1 = refline(CIpslope(1),CIpintercept(1)); set(y1,'Color','r');
             y2 = refline(CIpslope(2),CIpintercept(2)); set(y2,'Color','r');
@@ -329,6 +344,7 @@ if fig_flag ~= 0
             filled=[[y1.YData(1):step1:y1.YData(2)],[y2.YData(2):-step2:y2.YData(1)]];
             hold on; fillhandle=fill(xpoints,filled,[1 0 0]);
             set(fillhandle,'EdgeColor',[1 0 0],'FaceAlpha',0.2,'EdgeAlpha',0.8);%set edge color
+            box on
             
             % add histograms of bootstrap
             subplot(1,3,2); k = round(1 + log2(length(rpb))); hist(rpb,k); grid on;
@@ -338,7 +354,6 @@ if fig_flag ~= 0
             plot(repmat(CI.Pearson(1),max(hist(rpb,k)),1),[1:max(hist(rpb,k))],'r','LineWidth',4);
             plot(repmat(CI.Pearson(2),max(hist(rpb,k)),1),[1:max(hist(rpb,k))],'r','LineWidth',4);
             axis tight; colormap([.4 .4 1])
-            box on;set(gca,'Fontsize',14)
             
             subplot(1,3,3); k = round(1 + log2(length(rsb))); hist(rsb,k); grid on;
             mytitle = sprintf('Bootstrapped \n Spearmans'' corr h=%g', hboot.Spearman); 
@@ -347,11 +362,9 @@ if fig_flag ~= 0
             plot(repmat(CI.Spearman(1),max(hist(rsb,k)),1),[1:max(hist(rsb,k))],'r','LineWidth',4);
             plot(repmat(CI.Spearman(2),max(hist(rsb,k)),1),[1:max(hist(rsb,k))],'r','LineWidth',4);
             axis tight; colormap([.4 .4 1])
-            box on;set(gca,'Fontsize',14)
         end
     end
-    
-    
+     
     if strcmp(answer,'yes')
         for f = 1:p
             if fig_flag == 1
@@ -359,7 +372,7 @@ if fig_flag ~= 0
                 set(gcf,'Color','w');
             end
             
-            if nargout >4
+            if nargout >3
                 if ~isnan(r(f)); subplot(1,3,1); index = 3; else subplot(1,2,1); index = 2; end
                 M = sprintf('Spearman skipped correlation r=%g \n %g%%CI [%g %g]',r(f),(1-level)*100,CI(1,f),CI(2,f));
             else
@@ -391,7 +404,6 @@ if fig_flag ~= 0
             C = floor(min([MM(:,3);MM2(:,3)]) - min([MM(:,3);MM2(:,3)])*0.01);
             D = ceil(max([MM(:,4);MM2(:,4)]) + max([MM(:,4);MM2(:,4)])*0.01);
             axis([A B C D]);
-            box on;set(gca,'Fontsize',14)
             
             % plot the rank and Spearman
             subplot(1,index,2);
@@ -401,9 +413,8 @@ if fig_flag ~= 0
             hh = lsline; set(hh,'Color','r','LineWidth',4); axis tight
             xlabel('X rank','Fontsize',12); ylabel('Y rank','Fontsize',12);
             title(M,'Fontsize',16);
-            box on;set(gca,'Fontsize',14)
             
-            if nargout>4 && sum(isnan(CIpslope(:,f))) == 0
+            if nargout>3 && sum(isnan(CIpslope(:,f))) == 0
                 % add CI
                 y1 = refline(CIsslope(1,f),CIsintercept(1,f)); set(y1,'Color','r');
                 y2 = refline(CIsslope(2,f),CIsintercept(2,f)); set(y2,'Color','r');
@@ -414,6 +425,7 @@ if fig_flag ~= 0
                 filled=[[y1.YData(1):step1:y1.YData(2)],[y2.YData(2):-step2:y2.YData(1)]];
                 hold on; fillhandle=fill(xpoints,filled,[1 0 0]);
                 set(fillhandle,'EdgeColor',[1 0 0],'FaceAlpha',0.2,'EdgeAlpha',0.8);%set edge color
+                box on
                 
                 % add histograms of bootstrap
                 subplot(1,3,3); k = round(1 + log2(length(rsb(:,f)))); hist(rsb(:,f),k); grid on;
@@ -422,7 +434,6 @@ if fig_flag ~= 0
                 plot(repmat(CI(1,f),max(hist(rsb(:,f),k)),1),[1:max(hist(rsb(:,f),k))],'r','LineWidth',4);
                 plot(repmat(CI(2,f),max(hist(rsb(:,f),k)),1),[1:max(hist(rsb(:,f),k))],'r','LineWidth',4);
                 axis tight; colormap([.4 .4 1])
-                box on;set(gca,'Fontsize',14)
             end
         end
     end

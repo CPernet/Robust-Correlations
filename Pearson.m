@@ -1,30 +1,28 @@
-function [r,t,pval,hboot,CI,pboot] = Pearson(X,Y,fig_flag,level)
+function [r,t,pval,hboot,CI] = Pearson(X,Y,fig_flag,level)
 
 % compute the Pearson correlation along with the bootstrap CI
 %
-% FORMAT:  [r,t,p] = Pearson(X,Y)
-%          [r,t,p] = Pearson(X,Y,fig_flag,level)
-%          [r,t,p,hboot,CI] = Pearson(X,Y,fig_flag,level)
+% FORMAT: [r,t,p] = Pearson(X,Y)
+%         [r,t,p] = Pearson(X,Y,fig_flag,level)
+%         [r,t,p,hboot,CI] = Pearson(X,Y,fig_flag,level)
 %
-% INPUTS:  X and Y are 2 vectors or matrices, in the latter case,
-%          correlations are computed column-wise 
-%          fig_flag indicates to plot (default = 1) the data or not (0)
-%          level is the desired alpha level (default = 5%)
+% INPUT: X and Y are 2 vectors or matrices, in the latter case,
+%        correlations are computed column-wise 
+%        fig_flag indicates to plot (default = 1) the data or not (0)
+%        level is the desired alpha level (default = 5%)
 %
-% OUTPUTS: r is the Pearson correlation
-%          t is the associated t value
-%          pval is the corresponding p value
-%
-%          optional:
-%
-%          hboot 1/0 declares the test significant based on CI
-%          CI is the percentile bootstrap confidence interval
+% OUTPUT: r is the Pearson correlation
+%         t is the associated t value
+%         pval is the corresponding p value
+%         optional
+%         hboot 1/0 declares the test significant based on CI
+%         CI is the percentile bootstrap confidence interval
 %
 % If X and Y are matrices of size [n p], p correlations are computed
 % consequently, the CI are adjusted at a level alpha/p (Bonferonni
 % correction) and hboot is based on these adjusted CI (pval remain
 % uncorrected)
-
+%
 % Cyril Pernet v1
 % ---------------------------------
 %  Copyright (C) Corr_toolbox 2012
@@ -132,7 +130,7 @@ if fig_flag ~= 0
         answer = questdlg(['plots all ' num2str(p) ' correlations'],'Plotting option','yes','no','yes');
     else
         if fig_flag == 1
-            figure('Name','Pearson correlation');
+            figure('Name','boostrapped Pearson correlation');
             set(gcf,'Color','w'); 
         end
         
@@ -147,7 +145,6 @@ if fig_flag ~= 0
         xlabel('X','FontSize',14); ylabel('Y','FontSize',14);
         title(M,'FontSize',16);
         h=lsline; set(h,'Color','r','LineWidth',4);
-        box on;set(gca,'Fontsize',14)
         
         if nargout>3 % if bootstrap done plot CI
             y1 = refline(CIslope(1),CIintercept(1)); set(y1,'Color','r');
@@ -159,14 +156,14 @@ if fig_flag ~= 0
             filled=[[y1.YData(1):step1:y1.YData(2)],[y2.YData(2):-step2:y2.YData(1)]];
             hold on; fillhandle=fill(xpoints,filled,[1 0 0]);
             set(fillhandle,'EdgeColor',[1 0 0],'FaceAlpha',0.2,'EdgeAlpha',0.8);%set edge color
+            box on
             
             subplot(1,2,2); k = round(1 + log2(length(rb))); hist(rb,k); grid on;
-            title({'Bootstrapped correlations';['h=',num2str(hboot)]},'FontSize',16); hold on
+            title(['Bootstrapped correlations h=' num2str(hboot)],'FontSize',16); hold on
             xlabel('boot correlations','FontSize',14);ylabel('frequency','FontSize',14)
             plot(repmat(CI(1),max(hist(rb,k)),1),[1:max(hist(rb,k))],'r','LineWidth',4);
             plot(repmat(CI(2),max(hist(rb,k)),1),[1:max(hist(rb,k))],'r','LineWidth',4);
             axis tight; colormap([.4 .4 1])
-            box on;set(gca,'Fontsize',14)
         end
     end
     
@@ -188,7 +185,6 @@ if fig_flag ~= 0
             xlabel('X','FontSize',14); ylabel('Y','FontSize',14);
             title(M,'FontSize',16);
             h=lsline; set(h,'Color','r','LineWidth',4);
-            box on;set(gca,'Fontsize',14)
             
             if nargout>3
                 y1 = refline(CIslope(1,f),CIintercept(1,f)); set(y1,'Color','r');
@@ -200,14 +196,14 @@ if fig_flag ~= 0
                 filled=[[y1.YData(1):step1:y1.YData(2)],[y2.YData(2):-step2:y2.YData(1)]];
                 hold on; fillhandle=fill(xpoints,filled,[1 0 0]);
                 set(fillhandle,'EdgeColor',[1 0 0],'FaceAlpha',0.2,'EdgeAlpha',0.8);%set edge color
+                box on
                 
                 subplot(1,2,2); k = round(1 + log2(length(rb(:,f)))); hist(rb(:,f),k); grid on;
-                title({'Bootstrapped correlations';['h=',num2str(hboot(f))]},'FontSize',16); hold on
+                title(['Bootstrapped correlations h=' num2str(hboot(f))],'FontSize',16); hold on
                 xlabel('boot correlations','FontSize',14);ylabel('frequency','FontSize',14)
                 plot(repmat(CI(1,f),max(hist(rb(:,f),k)),1),[1:max(hist(rb(:,f),k))],'r','LineWidth',4);
                 plot(repmat(CI(2,f),max(hist(rb(:,f),k)),1),[1:max(hist(rb(:,f),k))],'r','LineWidth',4);
                 axis tight; colormap([.4 .4 1])
-                box on;set(gca,'Fontsize',14)
             end
         end
     end
