@@ -12,7 +12,6 @@ function [r,t,h,outid,hboot,CI]=skipped_correlation(x,y,fig_flag)
 %          [r,t,h,outid,hboot,CI] = skipped_correlation(X,Y,fig_flag);
 %
 % INPUTS:  X is a matrix and corelations between all pairs (default) are computed
-%          pairs (optional) is a n*2 matrix of pairs of column to correlate  
 %          fig_flag (optional, ( by default) indicates to plot the data or not
 %
 % OUTPUTS:

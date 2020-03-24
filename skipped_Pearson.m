@@ -35,9 +35,9 @@ function [rp,tp,CI,pval,outid,h]=skipped_Pearson(varargin)
 % thus for a correlation this is floor(n/2 + 5/2).
 %
 % The method for multiple comparisons correction is described in
-% Rand R. Wilcox, Guillaume A. Rousselet & Cyril R. Pernet (2018) 
-% Improved methods for making inferences about multiple skipped correlations, 
-% Journal of Statistical Computation and Simulation, 88:16, 3116-3131, 
+% Rand R. Wilcox, Guillaume A. Rousselet & Cyril R. Pernet (2018)
+% Improved methods for making inferences about multiple skipped correlations,
+% Journal of Statistical Computation and Simulation, 88:16, 3116-3131,
 % DOI: 10.1080/00949655.2018.1501051
 %
 % See also MCDCOV, IDEALF.
@@ -96,17 +96,18 @@ end
 %% start the algorithm
 
 % _create a table of resamples_
+boostrap_sampling = NaN(n,nboot);
 if nargout > 2
-  boot_index = 1;
-  while boot_index <= nboot
-      resample = randi(n,n,1);
-      if length(unique(resample)) > p % always more observations than variables
-          boostrap_sampling(:,boot_index) = resample;
-          boot_index = boot_index +1;
-      end
-  end
-  lower_bound = round((alphav*nboot)/2);
-  upper_bound = nboot - lower_bound;
+    boot_index = 1;
+    while boot_index <= nboot
+        resample = randi(n,n,1);
+        if length(unique(resample)) > p % always more observations than variables
+            boostrap_sampling(:,boot_index) = resample;
+            boot_index = boot_index +1;
+        end
+    end
+    lower_bound = round((alphav*nboot)/2);
+    upper_bound = nboot - lower_bound;
 end
 
 % now for each pair to test, get the observed and boostrapped r and t
@@ -117,80 +118,80 @@ end
 rp = NaN(size(pairs,1),1);
 for outputs = 2:nargout
     if outputs == 2
-    tp    = NaN(size(pairs,1),1);
-elseif outputs == 3
-    CI = NaN(size(pairs,1),2);
-elseif outputs == 4
-    pval  = NaN(size(pairs,1),1);
-elseif outputs == 5
-    outid = cell(size(pairs,1),1);
-end
-
-% loop for each pair to test
-for row = 1:size(pairs,1)
-
-    % select relevant columns
-    X = [x(:,pairs(row,1)) x(:,pairs(row,2))];
-    % get the bivariate outliers
-    flag = bivariate_outliers(X);
-    vec = 1:n;
-    if sum(flag)==0
-        outid{row}=[];
-    else
-        flag=(flag>=1);
-        outid{row}=vec(flag);
+        tp    = NaN(size(pairs,1),1);
+    elseif outputs == 3
+        CI = NaN(size(pairs,1),2);
+    elseif outputs == 4
+        pval  = NaN(size(pairs,1),1);
+    elseif outputs == 5
+        outid = cell(size(pairs,1),1);
     end
-    keep=vec(~flag); % the vector of data to keep
-
-    % Pearson correlation on cleaned data
-    rp(row) = sum(detrend(X(keep,1),'constant').*detrend(X(keep,2),'constant')) ./ ...
-        (sum(detrend(X(keep,1),'constant').^2).*sum(detrend(X(keep,2),'constant').^2)).^(1/2);
-    tp(row) = rp(row)*sqrt((n-2)/(1-rp(row).^2));
-
-    if nargout > 2
-        % redo this for bootstrap samples
-        % fprintf('computing p values by bootstrapping data, pair %g %g\n',pairs(row,1),pairs(row,2))
-        parfor b=1:nboot
-            Xb = X(boostrap_sampling(:,b),:);
-            r(b) = sum(detrend(Xb(keep,1),'constant').*detrend(Xb(keep,2),'constant')) ./ ...
-                (sum(detrend(Xb(keep,1),'constant').^2).*sum(detrend(Xb(keep,2),'constant').^2)).^(1/2);
-        end
-
-        % get the CI
-        r = sort(r);
-        CI(row,:) = [r(lower_bound) r(upper_bound)];
-
-        % get the p value
-        Q = sum(r<0)/nboot;
-        pval(row) = 2*min([Q 1-Q]);
-    end
-end
-
-
-%% once we have all the r and t values, we need to adjust for multiple comparisons
-if nargout > 3
-    if strcmp(method,'ECP')
-        if exist('p_alpha','var')
-            h = pval < p_alpha;
+    
+    % loop for each pair to test
+    for row = 1:size(pairs,1)
+        
+        % select relevant columns
+        X = [x(:,pairs(row,1)) x(:,pairs(row,2))];
+        % get the bivariate outliers
+        flag = bivariate_outliers(X);
+        vec = 1:n;
+        if sum(flag)==0
+            outid{row}=[];
         else
-            disp('ECP method requested, computing p alpha ... (takes a while)')
-            p_alpha = MC_corrpval(n,p,'Skipped Pearson',alphav,pairs);
+            flag=(flag>=1);
+            outid{row}=vec(flag);
         end
-    elseif strcmp('method','Hochberg')
-        [sorted_pval,index] = sort(pval,'descend');
-        k = 1; sig = 0; h = zeros(1,length(pval));
-        while sig == 0
-            if sorted_pval(k) < alphav/k
-                h(k:end) = 1; sig = 1;
-            else
-                k = k+1;
+        keep=vec(~flag); % the vector of data to keep
+        
+        % Pearson correlation on cleaned data
+        rp(row) = sum(detrend(X(keep,1),'constant').*detrend(X(keep,2),'constant')) ./ ...
+            (sum(detrend(X(keep,1),'constant').^2).*sum(detrend(X(keep,2),'constant').^2)).^(1/2);
+        tp(row) = rp(row)*sqrt((n-2)/(1-rp(row).^2));
+        
+        if nargout > 2
+            % redo this for bootstrap samples
+            % fprintf('computing p values by bootstrapping data, pair %g %g\n',pairs(row,1),pairs(row,2))
+            parfor b=1:nboot
+                Xb = X(boostrap_sampling(:,b),:);
+                r(b) = sum(detrend(Xb(keep,1),'constant').*detrend(Xb(keep,2),'constant')) ./ ...
+                    (sum(detrend(Xb(keep,1),'constant').^2).*sum(detrend(Xb(keep,2),'constant').^2)).^(1/2);
             end
+            
+            % get the CI
+            r = sort(r);
+            CI(row,:) = [r(lower_bound) r(upper_bound)];
+            
+            % get the p value
+            Q = sum(r<0)/nboot;
+            pval(row) = 2*min([Q 1-Q]);
         end
-        h = h(index);
     end
-end
-
-%% quick clean-up of individual p-values
-pval(pval==0) = 1/nboot;
-
+    
+    
+    %% once we have all the r and t values, we need to adjust for multiple comparisons
+    if nargout > 3
+        if strcmp(method,'ECP')
+            if exist('p_alpha','var')
+                h = pval < p_alpha;
+            else
+                disp('ECP method requested, computing p alpha ... (takes a while)')
+                p_alpha = MC_corrpval(n,p,'Skipped Pearson',alphav,pairs);
+            end
+        elseif strcmp('method','Hochberg')
+            [sorted_pval,index] = sort(pval,'descend');
+            k = 1; sig = 0; h = zeros(1,length(pval));
+            while sig == 0
+                if sorted_pval(k) < alphav/k
+                    h(k:end) = 1; sig = 1;
+                else
+                    k = k+1;
+                end
+            end
+            h = h(index);
+        end
+    end
+    
+    %% quick clean-up of individual p-values
+    pval(pval==0) = 1/nboot;
+end  
 disp('Skipped Pearson done')
