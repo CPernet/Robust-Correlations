@@ -17,7 +17,7 @@ function [rs,ts,CI,pval,outid,h]=skipped_Spearman(varargin)
 %
 % OUTPUTS: rs is the Spearman correlation
 %          ts is the T value associated to the skipped correlation
-%          CI is the robust confidence interval of r computed by bootstrapping 
+%          CI is the robust confidence interval of r computed by bootstrapping
 %             the cleaned-up data set and taking the alphav centile values
 %          pval is the p value associated to t
 %          outid is the index of bivariate outliers
@@ -33,6 +33,12 @@ function [rs,ts,CI,pval,outid,h]=skipped_Spearman(varargin)
 % floor((n+size(X,2)*2+1)/2)),
 % i.e. ((number of observations + number of variables*2)+1) / 2,
 % thus for a correlation this is floor(n/2 + 5/2).
+%
+% The method for multiple comparisons correction is described in
+% Rand R. Wilcox, Guillaume A. Rousselet & Cyril R. Pernet (2018) 
+% Improved methods for making inferences about multiple skipped correlations, 
+% Journal of Statistical Computation and Simulation, 88:16, 3116-3131, 
+% DOI: 10.1080/00949655.2018.1501051
 %
 % See also MCDCOV, IDEALF.
 %
@@ -90,31 +96,39 @@ end
 %% start the algorithm
 
 % _create a table of resamples_
-boot_index = 1;
-while boot_index <= nboot
-    resample = randi(n,n,1);
-    if length(unique(resample)) > 3 % at least 3 different data points
-        boostrap_sampling(:,boot_index) = resample;
-        boot_index = boot_index +1;
-    end
+if nargout > 2
+  boot_index = 1;
+  while boot_index <= nboot
+      resample = randi(n,n,1);
+      if length(unique(resample)) > 3 % at least 3 different data points
+          boostrap_sampling(:,boot_index) = resample;
+          boot_index = boot_index +1;
+      end
+  end
+  lower_bound = round((alphav*nboot)/2);
+  upper_bound = nboot - lower_bound;
 end
-lower_bound = round((alphav*nboot)/2);
-upper_bound = nboot - lower_bound;
 
 % now for each pair to test, get the observed and boostrapped r and t
 % values, then derive the p value from the bootstrap (and hboot and CI if
 % requested)
 
 % place holders
-outid = cell(size(pairs,1),1);
 rs    = NaN(size(pairs,1),1);
-ts    = NaN(size(pairs,1),1);
-CI    = NaN(size(pairs,1),2);
-pval  = NaN(size(pairs,1),1);
+for outputs = 2:nargout
+    if outputs == 2
+    ts    = NaN(size(pairs,1),1);
+elseif outputs == 3
+  CI = NaN(size(pairs,1),2);
+elseif outputs == 4
+  pval  = NaN(size(pairs,1),1);
+elseif outputs == 5
+  outid = cell(size(pairs,1),1);
+end
 
 % loop for each pair to test
 for row = 1:size(pairs,1)
-    
+
     % select relevant columns
     X = [x(:,pairs(row,1)) x(:,pairs(row,2))];
     % get the bivariate outliers
@@ -127,13 +141,13 @@ for row = 1:size(pairs,1)
         outid{row}=vec(flag);
     end
     keep=vec(~flag); % the vector of data to keep
-    
+
     % Spearman correlation on cleaned data
     xrank = tiedrank(X(keep,1),0); yrank = tiedrank(X(keep,2),0);
     rs(row) = sum(detrend(xrank,'constant').*detrend(yrank,'constant')) ./ ...
         (sum(detrend(xrank,'constant').^2).*sum(detrend(yrank,'constant').^2)).^(1/2);
     ts(row) = rs(row)*sqrt((n-2)/(1-rs(row).^2));
-    
+
     if nargout > 2
         % redo this for bootstrap samples
         % fprintf('computing p values by bootstrapping data, pair %g %g\n',pairs(row,1),pairs(row,2))
@@ -143,11 +157,11 @@ for row = 1:size(pairs,1)
             r(b) = sum(detrend(xrank,'constant').*detrend(yrank,'constant')) ./ ...
                 (sum(detrend(xrank,'constant').^2).*sum(detrend(yrank,'constant').^2)).^(1/2);
         end
-        
+
         % get the CI
         r = sort(r);
         CI(row,:) = [r(lower_bound) r(upper_bound)];
-        
+
         % get the p value
         Q = sum(r<0)/nboot;
         pval(row) = 2*min([Q 1-Q]);
@@ -162,7 +176,8 @@ if nargout == 6
             h = pval < p_alpha;
         else
             disp('ECP method requested, computing p alpha ... (takes a while)')
-            p_alpha = MC_corrpval(n,p,'Skipped Pearson',alphav,pairs);
+            p_alpha = MC_corrpval(n,p,'Skipped Spearman',alphav,pairs);
+            h = pval < p_alpha;
         end
     elseif strcmp(method,'Hochberg')
         [sorted_pval,index] = sort(pval,'descend');
@@ -173,13 +188,16 @@ if nargout == 6
                 h(k:end) = 1; sig = 1;
             else
                 k = k+1;
+                if k == length(h)
+                    break
+                end
             end
         end
         h = h(reversed_index);
-        
+
         %% quick clean-up of individual p-values
         pval(pval==0) = 1/nboot;end
-    
+
 end
 
 disp('Skipped Spearman done')

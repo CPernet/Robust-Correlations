@@ -1,17 +1,15 @@
-# robustcorrtool
+=======
+# Robust Correlation Toolbox - in progress version
 
-robust correlation toolbox
+The toolbox computes robust correlations as in [Robust correlation analyses: false positive and power validation using a new open source Matlab toolbox](https://www.frontiersin.org/articles/10.3389/fpsyg.2012.00606/full) and includes updates on multiple comparisons following [Improved methods for making inferences about multiple skipped correlations](https://www.tandfonline.com/doi/abs/10.1080/00949655.2018.1501051).
 
-Reference:
+Known issue: CI of skipped correlations are biased and should not be used for inference.
 
-Pernet, C.R., Wilcox, R. & Rousselet, G.A. (2012) 
-**Robust correlation analyses: false positive and power validation using a new open source matlab toolbox.** 
-*Front Psychol*, 3, 606.
-[[article](https://www.frontiersin.org/articles/10.3389/fpsyg.2012.00606/full)]
-
-**Compare correlation coefficients**
-
-- `compare_corr_ind` to compare two independent correlations.
-- `compare_corr_dep` to compare two dependent correlations that are overlapping or non-overlapping.
-
+## in progress
+- unify inputs/outputs
+- fix CI 
+- add comparison for correlations
+ 
+## wishes
+- R and python versions
 

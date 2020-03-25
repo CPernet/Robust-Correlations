@@ -62,10 +62,10 @@ end
 %% basic Spearman
 
 % compute r (default)
-xrank = tiedrank(X,0);
-yrank = tiedrank(Y,0);
-r = sum(detrend(xrank,'constant').*detrend(yrank,'constant')) ./ ...
-    (sum(detrend(xrank,'constant').^2).*sum(detrend(yrank,'constant').^2)).^(1/2);
+Xrank = tiedrank(X,0);
+Yrank = tiedrank(Y,0);
+r = sum(detrend(Xrank,'constant').*detrend(Yrank,'constant')) ./ ...
+    (sum(detrend(Xrank,'constant').^2).*sum(detrend(Yrank,'constant').^2)).^(1/2);
 t = r.*(sqrt(n-2)) ./ sqrt((1-r.^2));
 pval = 2*tcdf(-abs(t),n-2);
 % The corr function in the stat toolbox uses
@@ -133,7 +133,7 @@ if fig_flag ~= 0
             M = sprintf('Spearman corr r=%g p=%g',r,pval);
         end
         
-        scatter(xrank,yrank,100,'filled'); grid on
+        scatter(Xrank,Yrank,100,'filled'); grid on
         xlabel('X Rank','FontSize',14); ylabel('Y Rank','FontSize',14);
         title(M,'FontSize',16); 
         h=lsline; set(h,'Color','r','LineWidth',4);
@@ -164,9 +164,7 @@ if fig_flag ~= 0
     
     if strcmp(answer,'yes')
         for f = 1:p
-            if fig_flag == 1
-                figure('Color','w','Name',[num2str(f) ' Spearman correlation'])
-            end
+            figure('Color','w','Name',[num2str(f) ' Spearman correlation'])
             
             if nargout >3
                 subplot(1,2,1);
@@ -175,7 +173,7 @@ if fig_flag ~= 0
                 M = sprintf('Spearman corr r=%g p=%g',r(f),pval(f));
             end
             
-            scatter(xrank(:,f),yrank(:,f),100,'filled'); grid on
+            scatter(Xrank(:,f),Yrank(:,f),100,'filled'); grid on
             xlabel('X Rank','FontSize',14); ylabel('Y Rank','FontSize',14);
             title(M,'FontSize',16);
             h=lsline; set(h,'Color','r','LineWidth',4);

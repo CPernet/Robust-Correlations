@@ -60,7 +60,7 @@ parfor MC = 1:1000
     elseif strcmp(method,'Skipped Pearson')
         [r,t,~,pval] = skipped_Pearson(MVN,pairs);
     elseif strcmp(method,'Skipped Spearman')
-        [r,t,pval] = skipped_Spearman(MVN,pairs);
+        [r,t,~,pval] = skipped_Spearman(MVN,pairs);
     end
     
     v(MC)   = max(r);

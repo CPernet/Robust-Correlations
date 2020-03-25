@@ -1,4 +1,4 @@
-function [r,t,h,outid,hboot,CI]=skipped_correlation(X,fig_flag)
+function [r,t,h,outid,hboot,CI]=skipped_correlation(x,y,fig_flag)
 
 % performs a robust correlation using pearson/spearman correlation on
 % data cleaned up for bivariate outliers - that is after finding the
