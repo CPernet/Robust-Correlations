@@ -11,8 +11,9 @@ function [r,t,h,outid,hboot,CI]=skipped_correlation(x,y,fig_flag)
 %          [r,t,h] = skipped_correlation(X,fig_flag);
 %          [r,t,h,outid,hboot,CI] = skipped_correlation(X,Y,fig_flag);
 %
-% INPUTS:  X is a matrix and corelations between all pairs (default) are computed
-%          fig_flag (optional, ( by default) indicates to plot the data or not
+% INPUTS:  X is a matrix and correlations between all pairs (default) are computed
+%          pairs (optional) is a n*2 matrix of pairs of columns to correlate  
+%          fig_flag (optional), indicates to plot the data or not [0/1]
 %
 % OUTPUTS:
 %          r is the pearson/spearman correlation 
@@ -46,11 +47,11 @@ function [r,t,h,outid,hboot,CI]=skipped_correlation(x,y,fig_flag)
 %% data check
 
 if nargin <2 
-    error('not enough input arguments');
+    error('Not enough input arguments');
 elseif nargin == 2
     fig_flag = 1;
 elseif nargin > 3
-    error('too many input arguments');
+    error('Too many input arguments');
 end
 
 % transpose if x or y are not in column

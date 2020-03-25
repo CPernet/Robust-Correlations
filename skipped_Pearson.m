@@ -17,7 +17,6 @@ function [rp,tp,CI,pval,outid,h]=skipped_Pearson(varargin)
 %
 % OUTPUTS: rp is the Pearson correlation
 %          tp is the T value associated to the skipped correlation
-%          CI is the robust confidence interval of r computed by bootstrapping
 %             the cleaned-up data set and taking the alphav centile values
 %          pval is the p value associated to t
 %          outid is the index of bivariate outliers

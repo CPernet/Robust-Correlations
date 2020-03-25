@@ -1,4 +1,4 @@
-function [r,t,pval,hboot,CI,pboot] = Pearson(X,Y,fig_flag,level)
+function [r,t,pval,hboot,CI] = Pearson(X,Y,fig_flag,level)
 
 % compute the Pearson correlation along with the bootstrap CI
 %
