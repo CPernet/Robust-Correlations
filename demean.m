@@ -8,7 +8,7 @@ function y = demean(x)
 %  Copyright (C) Corr_toolbox 2014
 
 n = size(x,1);
-if n == 1,
+if n == 1
   x = x(:);	% If a single row, turn into column vector
 end
 N = size(x,1);
