@@ -54,7 +54,14 @@ for v=1:2:size(varargin,2)
         end
     end
 end
+
+% default number of bootstraps
 [n,p] = size(X);
+if p == 1
+    nboot = 599;
+else
+    nboot  = 1000;
+end
 
 %% Basic Pearson
 
@@ -65,26 +72,35 @@ pval = 2*tcdf(-abs(t),n-2);
 
 %% compute the CI
 if nargout > 3
-    % adjust boot parameters
-    if p == 1
-        nboot = 599;
-        % adjust percentiles following Wilcox
-        if n < 40
-            low = 7 ; high = 593;
-        elseif n >= 40 && n < 80
-            low = 8 ; high = 592;
-        elseif n >= 80 && n < 180
-            low = 11 ; high = 588;
-        elseif n >= 180 && n < 250
-            low = 14 ; high = 585;
-        elseif n >= 250
-            low = 15 ; high = 584;
+    
+    % get bootstrapped r
+    NB = round(1.2*nboot); % always do a few more to avoid NaNs
+    table = randi(n,n,NB); 
+    for B=NB:-1:1
+        rb(B,:) = sum(detrend(X(table(:,B),:),'constant').*detrend(Y(table(:,B),:),'constant')) ./ ...
+            (sum(detrend(X(table(:,B),:),'constant').^2).*sum(detrend(Y(table(:,B),:),'constant').^2)).^(1/2);
+        if strcmpi(figflag ,'on')
+            for c=size(X,2):-1:1
+                b              = pinv([X(table(:,B),c) ones(n,1)])*Y(table(:,B),c);
+                slope(B,c)     = b(1);
+            end
         end
+    end
+    
+    [rb,index] = sort(rb,1); % keep same index as r for slopes
+    rb         = rb(1:nboot,:); % NaN at the end if any, should be gone
+    index      = index(1:nboot,:);
+    slope      = slope(index,:);
+
+    % get CI bound
+    nanval = sum(isnan(rb));
+    if p == 1
+        % adjust percentiles following Wilcox
+        [low,high] = wilcox_adjustement(nboot-nanval);
         
     else
-        nboot  = 1000;
-        alphav = alphav / p;
-        low = round((alphav*nboot)/2);
+        alphav = alphav / p; % Bonferroni corrected 
+        low    = round((alphav*(nboot-nanval))/2);
         if low == 0
             error('adjusted CI cannot be computed, too many tests for the number of observations')
         else
@@ -92,35 +108,14 @@ if nargout > 3
         end
     end
     
-    % compute hboot and CI
-    table = randi(n,n,nboot);
-    for B=nboot:-1:1
-        rb(B,:) = sum(detrend(X(table(:,B),:),'constant').*detrend(Y(table(:,B),:),'constant')) ./ ...
-            (sum(detrend(X(table(:,B),:),'constant').^2).*sum(detrend(Y(table(:,B),:),'constant').^2)).^(1/2);
-        if strcmpi(figflag ,'on')
-            for c=size(X,2):-1:1
-                b              = pinv([X(table(:,B),c) ones(n,1)])*Y(table(:,B),c);
-                slope(B,c)     = b(1);
-                intercept(B,c) = b(2,:);
-            end
-        end
-    end
-    
-    [rb,index] = sort(rb,1); % keep same index as r for slopes
-    intercept  = intercept(index);
-    slope      = slope(index);
-    
-    % CI and h
-    adj_nboot = nboot - sum(isnan(rb));
-    adj_low   = round((alphav*adj_nboot)/2);
-    adj_high  = adj_nboot - adj_low;
-    
+    % CI and h   
     for c=size(X,2):-1:1
-        CI(:,c)              = [rb(adj_low(c),c) ; rb(adj_high(c),c)];
-        hboot(c)             = (rb(adj_low(c),c) > 0) + (rb(adj_high(c),c) < 0);
+        CI(:,c)            = [rb(low(c),c) ; rb(high(c),c)];
+        hboot(c)           = (rb(low(c),c) > 0) + (rb(high(c),c) < 0);
         if strcmpi(figflag ,'on')
-            CIslope(:,c)     = [slope(adj_low(c),c) ; slope(adj_high(c),c)];
-            CIintercept(:,c) = [intercept(adj_low(c),c) ; intercept(adj_high(c),c)];
+            CIslope(:,c)   = [slope(low(c),c) ; slope(high(c),c)];
+            b              = pinv([X(:,c) ones(n,1)])*Y(:,c);
+            CIintercept(c) = b(2);
         end
     end
 end
@@ -138,15 +133,13 @@ if strcmpi(figflag ,'on')
             M = sprintf('Pearson corr r=%g \n p=%g',r(f),pval(f));
         end
         
-        scatter(X(:,f),Y(:,f),100,'filled'); grid on
-        xlabel('X','FontSize',14); ylabel('Y','FontSize',14);
-        title(M,'FontSize',16);
-        h=lsline; set(h,'Color','r','LineWidth',4);
-        box on;set(gca,'Fontsize',14)
-        
+        scatter(X(:,f),Y(:,f),100,'filled'); grid on; box on;
+        xlabel('X','FontSize',12); ylabel('Y','FontSize',12);
+        title(M,'FontSize',14); h=lsline; set(h,'Color','r','LineWidth',4);
+       
         if nargout>3 % if bootstrap done plot CI
-            y1 = refline(CIslope(1),CIintercept(1)); set(y1,'Color','r');
-            y2 = refline(CIslope(2),CIintercept(2)); set(y2,'Color','r');
+            y1 = refline(CIslope(1),CIintercept(c)); set(y1,'Color','r');
+            y2 = refline(CIslope(2),CIintercept(c)); set(y2,'Color','r');
             y1 = get(y1); y2 = get(y2);
             xpoints=[[y1.XData(1):y1.XData(2)],[y2.XData(2):-1:y2.XData(1)]];
             step1 = y1.YData(2)-y1.YData(1); step1 = step1 / (y1.XData(2)-y1.XData(1));
@@ -155,18 +148,35 @@ if strcmpi(figflag ,'on')
             hold on; fillhandle=fill(xpoints,filled,[1 0 0]);
             set(fillhandle,'EdgeColor',[1 0 0],'FaceAlpha',0.2,'EdgeAlpha',0.8);%set edge color
             
-            subplot(1,2,2); k = round(1 + log2(length(rb))); hist(rb,k); grid on;
-            title({'Bootstrapped correlations';['h=',num2str(hboot)]},'FontSize',16); hold on
-            xlabel('boot correlations','FontSize',14);ylabel('frequency','FontSize',14)
-            plot(repmat(CI(1),max(hist(rb,k)),1),[1:max(hist(rb,k))],'r','LineWidth',4);
-            plot(repmat(CI(2),max(hist(rb,k)),1),[1:max(hist(rb,k))],'r','LineWidth',4);
-            axis tight; colormap([.4 .4 1])
-            box on;set(gca,'Fontsize',14)
+            subplot(1,2,2); k = round(1 + log2(length(rb))); 
+            MV = histogram(rb(:,f),k); MV = max(MV.Values); grid on;
+            title({'Bootstrapped correlations';['h=',num2str(hboot(f))]},'FontSize',14); hold on
+            xlabel('boot correlations','FontSize',12);ylabel('frequency','FontSize',12)            
+            plot(repmat(CI(1),MV,1),1:MV,'r','LineWidth',4);
+            plot(repmat(CI(2),MV,1),1:MV,'r','LineWidth',4);
+            axis tight; colormap([.4 .4 1]); box on;
         end
     end
 end
+end
 
+% ---------------------------------------------------------
+% adjustement of CI bound when p = 1
 
+function [low,high] = wilcox_adjustement(n)
+
+if n < 40
+    low = 7 ; high = 593;
+elseif n >= 40 && n < 80
+    low = 8 ; high = 592;
+elseif n >= 80 && n < 180
+    low = 11 ; high = 588;
+elseif n >= 180 && n < 250
+    low = 14 ; high = 585;
+elseif n >= 250
+    low = 15 ; high = 584;
+end
+end
 
 
 
