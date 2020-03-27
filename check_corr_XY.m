@@ -1,6 +1,6 @@
 function [X,Y]=check_corr_XY(X,Y)
 
-% routine used by all correlation functions to check the size of X and Y
+% Routine used by all correlation functions to check the size of X and Y
 %
 % FORMAT [X,Y]=check_corr_XY(X,Y)
 % INPUT   X and Y are the data in of a correlation function
@@ -22,3 +22,5 @@ if size(Y,1) == 1 && size(X,2) > 1; Y = repmat(Y,1,size(X,2)); end
 if any(size(X)~=size(Y)) 
     error('X and Y must have the same size')
 end
+
+
