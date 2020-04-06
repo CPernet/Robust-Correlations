@@ -1,10 +1,23 @@
-function [r,t,pval,CI,hboot] = Pearson(X,Y,varargin)
+function [r,t,pval,CI] = Pearson(X,Y,varargin)
 
-% Computes the Pearson correlation along with the bias corrected and accelerated
-% percentile bootstrap Confidence Interval. Note there are no good method for CI but
-% the BCa gives a relatively good probability coverage under the null.
+% Computes the Pearson correlation along with the alpha percent CI using
+% the Z-transform which gives a relativey good probability coverage under 
+% normality assumptions. This returns in t(1) and pval(1) the same values
+% as the Matlab corrcoef function. When H0 is rejected (say pval<0.05),
+% it is reasonable to conclude that X and Y are dependent, but the nature of
+% that dependence is unclear. If fact, in case of heteroscedasticity, even for
+% rho = 0, H0 can be rejected because the t value relies on a wrong estimate
+% of the variance, i.e. the test statisitics t, tests if X and Y are independent
+% rather than testing if rho =0. Therefore, if pval is below the alpha level 
+% (H0 rejected) it should be compared to a robust t-test version that
+% correct the covariance. Here, we return in t(2) and pval(2) such values
+% using the HC4 estimator of the standard error (Godfrey, 2006). If that 
+% second p-value is also below alpha, CI are retuned using the standard
+% z-transform. If pval is above alpha, but the robust estimate is below, the
+% discrepency is likely due to heteroscedasticity and no good CI can be
+% derived (returns NaN).
 %
-% FORMAT:  [r,t,p]    = Pearson(X,Y,options)
+% FORMAT:  [r,t,p,CI] = Pearson(X,Y)
 %          [r,t,p,CI] = Pearson(X,Y,'figure','on','alpha',0.05)
 %
 % INPUTS:  X and Y are 2 vectors or matrices (correlations are computed column-wise)
@@ -12,17 +25,23 @@ function [r,t,pval,CI,hboot] = Pearson(X,Y,varargin)
 %                  replicated to match the matrix size
 %          options are 'figure', if X and Y are vectors, this is 'on' by
 %                                default, if X and Y are matrices this 'off' by default
-%                      'alpha', the alpha level to use for the confidence
-%                               interval (default is 5% Bonferroni adjusted)
+%                      'alpha', the alpha level to use for the confidence interval
+%          If X and Y are matrices of size [n p], p correlations are computed and
+%          the CI are adjusted at a level alpha/p (Bonferonni correction)
 %
 % OUTPUTS: r is the Pearson correlation
-%          t is the associated t value
-%          pval is the corresponding p value
-%          CI is the percentile bootstrap confidence interval
+%          t are the t-values using the standard equation and using the hc4 variance estimate
+%          pval are the p values corresponding to t-tests 
+%          CI is 1-alpha confidence interval (only if all(pvals<alpha) or all(pvals>alpha))
 %
-% If X and Y are matrices of size [n p], p correlations are computed
-% consequently, the CI are adjusted at a level alpha/p (Bonferonni
-% correction)
+% If 'figure' is on, the data scatter plot is shown with the least 
+% square fit of the data and the confidence intervals from the r value. As a 
+% sanity check, the boostrapped correlations are also shown reporting the 
+% median of bootstrapped value.
+%
+% References:
+% Godfrey (2006)
+% Wilcox (2017)
 %
 % Dr Cyril Pernet - University of Edinburgh
 % -----------------------------------------
@@ -36,9 +55,9 @@ else
 end
 
 % defaults
-nboot  = 1000;
-alphav = 5/100;
-method = 'bias corrected accelerated';
+nboot              = 1000;
+alphav             = 5/100;
+heteroscedasticity = 'unspecified'; % undocumented, on/off forces to return a CI (never a NaN)
 if size(X,2) == 1 % and therefore size(Y,2) = 1 as well
     figflag = 'on';
 else
@@ -49,98 +68,85 @@ end
 for v=1:2:size(varargin,2)
     if strcmpi(varargin{v},'figure')
         figflag = varargin{v+1};
+    elseif strcmpi(varargin{v}(1:6),'hetero') 
+        heteroscedasticity = varargin{v+1};
+        if ~strcmpi(varargin{v},'heteroscedasticity')
+            fprintf('taking argument in ''%s'' as heteroscedasticity \n',varargin{v})
+        end
     elseif strcmpi(varargin{v},'alpha')
         alphav = varargin{v+1};
         if ~isnumeric(alphav)
             alphav = str2double(alphav);
         end
-    elseif strcmpi(varargin{v},'method') % undocumented since only BCa ~works
-        method = varargin{v+1};
     end
 end
+
 [n,p]  = size(X);
+alphav = alphav./ p;
 
-%% Basic Pearson
+%% compute
 
-r    = sum(detrend(X,'constant').*detrend(Y,'constant')) ./ ...
-    (sum(detrend(X,'constant').^2).*sum(detrend(Y,'constant').^2)).^(1/2);
-t    = r.*sqrt((n-2)./(1-r.^2));
-pval = 2*tcdf(-abs(t),n-2);
+r                        = sum(detrend(X,'constant').*detrend(Y,'constant')) ./ ...
+                           (sum(detrend(X,'constant').^2).*sum(detrend(Y,'constant').^2)).^(1/2);
+zr                       = 0.5 * log((1+r)./(1-r));
+zalpha                   = icdf('Normal',alphav/2,0,1);
+t                        = r.*sqrt((n-2)./(1-r.^2));
+pval                     = 2*tcdf(-abs(t),n-2);
+S                        = 1/sqrt(n-3); % assumed standard error
+if p==1
+    [t(2),pval(2),~,S_hc4] = get_hc4stats(r,zr,zscore(X,0,1),zscore(Y,0,1));
+else
+    [t(2,:),pval(2,:),~,S_hc4] = get_hc4stats(r,zr,zscore(X,0,1),zscore(Y,0,1));
+end
 
-%% compute the CI
-if nargout > 3
+for column = p:-1:1
+    if all(pval(:,column)<alphav) || all(pval(:,column)>alphav) || strcmpi(heteroscedasticity,'off')
+        CI(:,column) = tanh([zr(:,column)-abs(zalpha)*S ; zr(:,column)+abs(zalpha)*S]);
+    else
+        CI(:,column) = [NaN NaN]';
+    end
+end
+
+%% undocumented - do a percentile t for the hc4 CI (kinda work for n>80)
+if strcmpi(heteroscedasticity,'on')
     
-    % get bootstrapped r
-    NB = round(1.2*nboot); % always do a few more to avoid NaNs
-    table = randi(n,n,NB);
-    for B=NB:-1:1
+    for B=nboot:-1:1
+        % make a resampling table with enough unique pairs
+        go = 0; 
+        while go == 0
+            tmp = randi(n,n,1);
+            if length(unique(tmp))>=6
+                table(:,B) = tmp;
+                go = 1;
+            end
+        end
+    end
+    
+    % resample and compute
+    ibot = round(alphav*nboot/2)+1;
+    itop = nboot-ibot+2;
+    for column = p:-1:1
+        zX           = X(:,p);
+        zX           = zscore(zX(table),0,1); 
+        zY           = Y(:,p);
+        zY           = zscore(zY(table),0,1);
+        [~,~,B,S]    = get_hc4stats(r(column),zr(column),zX,zY); % all bootstraped betas and S
+        v            = sort((B-r(column))./sqrt(S));
+        CI(:,column) = [r(column)-v(itop)*sqrt(S_hc4(column)) r(column)-v(ibot)*sqrt(S_hc4(column))]';
+    end
+end
+
+%% figure
+if strcmpi(figflag ,'on')
+    if ~exist('table','var')
+        table = randi(n,n,nboot);
+    end
+    for B=nboot:-1:1
         rb(B,:) = sum(detrend(X(table(:,B),:),'constant').*detrend(Y(table(:,B),:),'constant')) ./ ...
             (sum(detrend(X(table(:,B),:),'constant').^2).*sum(detrend(Y(table(:,B),:),'constant').^2)).^(1/2);
-        if strcmpi(figflag ,'on')
-            for c=size(X,2):-1:1
-                b              = pinv([X(table(:,B),c) ones(n,1)])*Y(table(:,B),c);
-                slope(B,c)     = b(1);
-            end
-        end
-    end
-    
-    rb(isnan(rb)) = [];                % remove possible NaN
-    keep          = randi(NB,nboot,1); % choose nboot out of NB
-    rb            = rb(keep);          % retain nboot sample as intended
-    [rb,index]    = sort(rb,1);        % keep same index as r for slopes
-    if strcmpi(figflag ,'on')
-        slope = slope(keep);
-        slope = slope(index,:);
-    end
-    
-    % get the CI
-    nanval = sum(isnan(rb)); % should be 0, but JIC
-    nboot  = nboot-nanval;   % adjust valid number of bootstraps
-    alphav = alphav / p;     % Bonferroni corrected
-    
-    if strcmpi(method,'percentile')
-        low    = round((alphav*nboot)/2);
-        if low == 0
-            error('adjusted CI cannot be computed, too many tests for the number of observations')
-        else
-            high = nboot - low;
-        end
-    else 
-        % bias value zo (include half of the bootstrap values that are
-        % tied with the original sample value into z0)
-        z0     = icdf('Normal',mean(rb<r)+mean(rb==r,1)/2,0,1);
-        zalpha = icdf('Normal',alphav/2,0,1);
-       
-        if strcmpi(method,'bias corrected')
-            low  = floor(nboot*cdf('Normal',(2*z0+(zalpha)),0,1));
-            high = ceil(nboot*cdf('Normal',(2*z0-(zalpha)),0,1));
-        elseif strcmpi(method,'bias corrected accelerated')
-            % compute acceleration factor: DiCiccio and Efron (1996)
-            for ss=n:-1:1
-                index = 1:n; index(ss) = []; % jackknife
-                jr(ss,:) = Pearson(X(index,:),Y(index,:),'figure','off');
-            end
-            skew = skewness(mean(jr)-jr) /sqrt(n); % adjusted skewness
-            acc  = skew/6;                         % acceleration
-            low  = floor(nboot*cdf('Normal',(z0 +(z0+zalpha)./(1-acc.*(z0+zalpha))),0,1));
-            high = ceil(nboot*cdf('Normal',(z0 +(z0-zalpha)./(1-acc.*(z0-zalpha))),0,1));
-        end
-    end
-     
-    % CI and h
-    for c=p:-1:1
-        CI(:,c)  = [rb(low(c),c) ; rb(high(c),c)];
-        hboot(c) = (CI(1,c) > 0) + (CI(2,c)< 0);
-        if strcmpi(figflag ,'on')
-            CIslope(1,c)   = slope(low(c),c);
-            CIslope(2,c)   = slope(high(c),c);
-            b              = pinv([X(:,c) ones(n,1)])*Y(:,c);
-            CIintercept(c) = b(2);
-        end
     end
 end
-
-%% plots
+    
 if strcmpi(figflag ,'on')
     for f=1:length(r)
         figure('Name',sprintf('Pearson correlation X%g Y%g',f,f));
@@ -158,8 +164,10 @@ if strcmpi(figflag ,'on')
         title(M,'FontSize',14); h=lsline; set(h,'Color','r','LineWidth',4);
         
         if nargout>3 % if bootstrap done plot CI
-            y1 = refline(CIslope(1,f),CIintercept(c)); set(y1,'Color','r');
-            y2 = refline(CIslope(2,f),CIintercept(c)); set(y2,'Color','r');
+            betas = pinv([X(:,f) ones(n,1)])*Y(:,f);
+            transform = betas(1)/r(f);
+            y1 = refline(CI(1,f)*transform,betas(2)); set(y1,'Color','r');
+            y2 = refline(CI(2,f)*transform,betas(2)); set(y2,'Color','r');
             y1 = get(y1); y2 = get(y2);
             xpoints=[y1.XData(1):y1.XData(2),y2.XData(2):-1:y2.XData(1)];
             step1 = y1.YData(2)-y1.YData(1); step1 = step1 / (y1.XData(2)-y1.XData(1));
@@ -168,18 +176,42 @@ if strcmpi(figflag ,'on')
             hold on; fillhandle=fill(xpoints,filled,[1 0 0]);
             set(fillhandle,'EdgeColor',[1 0 0],'FaceAlpha',0.2,'EdgeAlpha',0.8);%set edge color
             
-            subplot(1,2,2); k = round(1 + log2(nboot(c)));
+            subplot(1,2,2); k = round(1 + log2(nboot));
             MV = histogram(rb(:,f),k); MV = max(MV.Values); grid on;
-            title('Bootstrapped correlations','FontSize',14); hold on
+            title(sprintf('Bootstrapped correlations \n median=%g',median(rb)),'FontSize',14); 
             xlabel('boot correlations','FontSize',12);ylabel('frequency','FontSize',12)
-            plot(repmat(CI(1,f),MV,1),1:MV,'r','LineWidth',4);
+            hold on; plot(repmat(CI(1,f),MV,1),1:MV,'r','LineWidth',4);
             plot(repmat(CI(2,f),MV,1),1:MV,'r','LineWidth',4);
+            plot(median(rb),MV/2,'ko','LIneWidth',3)
             axis tight; colormap([.4 .4 1]); box on;
         end
     end
 end
 
 
+function [t,pval,B,V] = get_hc4stats(r,zr,zX,zY)
 
+% sub-routine for compute the t,pval and CI
+[n,p]=size(zX);
+if size(r) == [1 1]
+    r  = repmat(r,1,p);
+    zr = repmat(zr,1,p);
+end
+
+for column = p:-1:1
+    D             = [ones(n,1) zX(:,column)];
+    Betas         = pinv(D)*zY(:,column);
+    B(column)     = Betas(2);
+    residuals     = zY(:,column) - D*Betas;
+    for row=n:-1:1
+        h(row,:)  = D(row,:)*inv(D'*D)*D(row,:)';
+    end
+    d             = min(4,h/mean(h)); %n*h / sum(h)
+    S             = inv(D'*D)*D'*diag((residuals.^2)./((1-h).^d))*D*inv(D'*D);
+    S             = diag(S); 
+    V(column)     = S(2:end); % estimates of squared standard error of r
+    t(column)     = r(column)/sqrt(V(column));
+    pval(column)  = 2*tcdf(-abs(t(column)),n-2);
+end
 
 
