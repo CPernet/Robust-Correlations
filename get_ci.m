@@ -49,15 +49,36 @@ end
 
 %% get the bootstrapped statistics
 NB = round(1.2*nboot); % always do a few more to avoid NaNs
-table = randi(n,n,NB);
+for B=nboot:-1:1
+    % make a resampling boot_table with enough unique pairs
+    go = 0;
+    while go == 0
+        tmp = randi(n,n,1);
+        if length(unique(tmp))>=6
+            boot_table(:,B) = tmp;
+            go = 1;
+        end
+    end
+end
+        
 for B=NB:-1:1
     if strcmpi(correlation,'Pearson')
-        r(B,:) = sum(detrend(X(table(:,B),:),'constant').*detrend(Y(table(:,B),:),'constant')) ./ ...
-            (sum(detrend(X(table(:,B),:),'constant').^2).*sum(detrend(Y(table(:,B),:),'constant').^2)).^(1/2);
+        r(B,:) = sum(detrend(X(boot_table(:,B),:),'constant').*detrend(Y(boot_table(:,B),:),'constant')) ./ ...
+            (sum(detrend(X(boot_table(:,B),:),'constant').^2).*sum(detrend(Y(boot_table(:,B),:),'constant').^2)).^(1/2);
     elseif strcmpi(correlation','Spearman')
-        xrank = tiedrank(X(table(:,B),:),0); yrank = tiedrank(Y(table(:,B),:),0);
+        xrank = tiedrank(X(boot_table(:,B),:),0); yrank = tiedrank(Y(boot_table(:,B),:),0);
         r(B,:) = sum(detrend(xrank,'constant').*detrend(yrank,'constant')) ./ ...
             (sum(detrend(xrank,'constant').^2).*sum(detrend(yrank,'constant').^2)).^(1/2);
+    elseif strcmpi(correlation','Kendall')
+        rX = tiedrank(X(boot_table(:,B),:),1);
+        rY = tiedrank(Y(boot_table(:,B),:),1);
+        t1 = Xadj(1); n1 = sum((t1*(t1-1))/2);
+        t2 = Yadj(1); n2 = sum((t2*(t2-1))/2);
+        K = 0;
+        for k = 1:n-1
+            K = K + sum(sign(rX(k)-rX(k+1:n)).*sign(rY(k)-rY(k+1:n)));
+        end
+        r(B,:) = K / sqrt((n0-n1)*(n0-n2));
     end
 end
 
