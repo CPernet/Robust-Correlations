@@ -163,55 +163,34 @@ if strcmpi(figflag ,'on')
         xlabel('X','FontSize',12); ylabel('Y','FontSize',12);
         title(M,'FontSize',14); h=lsline; set(h,'Color','r','LineWidth',4);
         
-        if nargout>3 % if bootstrap done plot CI
-            betas = pinv([X(:,f) ones(n,1)])*Y(:,f);
-            transform = betas(1)/r(f);
-            y1 = refline(CI(1,f)*transform,betas(2)); set(y1,'Color','r');
-            y2 = refline(CI(2,f)*transform,betas(2)); set(y2,'Color','r');
-            y1 = get(y1); y2 = get(y2);
-            xpoints=[y1.XData(1):y1.XData(2),y2.XData(2):-1:y2.XData(1)];
-            step1 = y1.YData(2)-y1.YData(1); step1 = step1 / (y1.XData(2)-y1.XData(1));
-            step2 = y2.YData(2)-y2.YData(1); step2 = step2 / (y2.XData(2)-y2.XData(1));
-            filled=[y1.YData(1):step1:y1.YData(2),y2.YData(2):-step2:y2.YData(1)];
-            hold on; fillhandle=fill(xpoints,filled,[1 0 0]);
-            set(fillhandle,'EdgeColor',[1 0 0],'FaceAlpha',0.2,'EdgeAlpha',0.8);%set edge color
+        if nargout>3 % if bootstrap done 
             
             subplot(1,2,2); k = round(1 + log2(nboot));
             MV = histogram(rb(:,f),k); MV = max(MV.Values); grid on;
-            title(sprintf('Bootstrapped correlations \n median=%g',median(rb)),'FontSize',14); 
+            title(sprintf('Bootstrapped correlations \n median=%g',median(rb)),'FontSize',14);
             xlabel('boot correlations','FontSize',12);ylabel('frequency','FontSize',12)
             hold on; plot(repmat(CI(1,f),MV,1),1:MV,'r','LineWidth',4);
-            plot(repmat(CI(2,f),MV,1),1:MV,'r','LineWidth',4);
-            plot(median(rb),MV/2,'ko','LIneWidth',3)
             axis tight; colormap([.4 .4 1]); box on;
+            plot(median(rb),MV/2,'ko','LIneWidth',3)
+            
+            if all(~isnan(CI(:,f))) % plot CI
+                plot(repmat(CI(2,f),MV,1),1:MV,'r','LineWidth',4);
+                subplot(1,2,1); hold on
+                betas = pinv([X(:,f) ones(n,1)])*Y(:,f);
+                transform = betas(1)/r(f);
+                y1 = refline(CI(1,f)*transform,betas(2)); set(y1,'Color','r');
+                y2 = refline(CI(2,f)*transform,betas(2)); set(y2,'Color','r');
+                y1 = get(y1); y2 = get(y2);
+                xpoints=[y1.XData(1):y1.XData(2),y2.XData(2):-1:y2.XData(1)];
+                step1 = y1.YData(2)-y1.YData(1); step1 = step1 / (y1.XData(2)-y1.XData(1));
+                step2 = y2.YData(2)-y2.YData(1); step2 = step2 / (y2.XData(2)-y2.XData(1));
+                filled=[y1.YData(1):step1:y1.YData(2),y2.YData(2):-step2:y2.YData(1)];
+                hold on; fillhandle=fill(xpoints,filled,[1 0 0]);
+                set(fillhandle,'EdgeColor',[1 0 0],'FaceAlpha',0.2,'EdgeAlpha',0.8);%set edge color
+            end
+            
+
         end
     end
 end
-
-
-function [t,pval,B,V] = get_hc4stats(r,zr,zX,zY)
-
-% sub-routine for compute the t,pval and CI
-[n,p]=size(zX);
-if size(r) == [1 1]
-    r  = repmat(r,1,p);
-    zr = repmat(zr,1,p);
-end
-
-for column = p:-1:1
-    D             = [ones(n,1) zX(:,column)];
-    Betas         = pinv(D)*zY(:,column);
-    B(column)     = Betas(2);
-    residuals     = zY(:,column) - D*Betas;
-    for row=n:-1:1
-        h(row,:)  = D(row,:)*inv(D'*D)*D(row,:)';
-    end
-    d             = min(4,h/mean(h)); %n*h / sum(h)
-    S             = inv(D'*D)*D'*diag((residuals.^2)./((1-h).^d))*D*inv(D'*D);
-    S             = diag(S); 
-    V(column)     = S(2:end); % estimates of squared standard error of r
-    t(column)     = r(column)/sqrt(V(column));
-    pval(column)  = 2*tcdf(-abs(t(column)),n-2);
-end
-
 
