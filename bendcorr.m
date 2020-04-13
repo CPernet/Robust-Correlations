@@ -1,241 +1,194 @@
-function [r,t,p,hboot,CI,H,pH] = bendcorr(X,Y,fig_flag,beta)
+function [r,t,p,CI,H,pH] = bendcorr(X,Y,varargin)
 
-% Computes the percentage bend correlation along with the bootstrap CI
+% Computes the percentage bend correlation along with the bootstrap CI.
+% When H0 is rejected (say pval<0.05), it is reasonable to conclude that X
+% and Y are dependent, but the nature of that dependence is unclear. If fact,
+% in case of heteroscedasticity, even for rho = 0, H0 can be rejected because
+% the t value relies on a wrong estimate of the variance, i.e. the test 
+% statisitics t, tests if X and Y are independent rather than testing if 
+% rho =0. Therefore, if pval is below the alpha level (H0 rejected) it should
+% be compared to a robust t-test version that correct the covariance. Here, 
+% we return in t(2) and pval(2) such values using the HC4 estimator of the 
+% standard error (Godfrey, 2006). If that second p-value is also below alpha,
+% CI are retuned using the standard z-transform. If pval is above alpha, but
+% the robust estimate is below, the discrepency is likely due to heteroscedasticity
+% and no good CI can be derived (returns NaN).
 %
-% FORMAT:  [r,t,p] = bendcorr(X,Y)
-%          [r,t,p,hboot,CI,H,pH] = bendcorr(X,Y,fig_flag,beta)
+% FORMAT:  [r,t,p,CI]      = bendcorr(X,Y,'beta',0.2)
+%          [r,t,p,CI]      = bendcorr(X,Y,'beta',0.2,'figure','on','alpha',0.05)
+%          [r,t,p,CI,H,pH] = bendcorr(X,Y,'beta',0.2,'figure','on','alpha',0.05)
 %
-% INPUTS:  X and Y are 2 vectors or matrices. In the latter case,
-%          correlations are computed column-wise. 
-%          fig_flag indicates to plot (1 - default) the data or not (0)
-%          beta represents the amount of trimming: 0 <= beta <= 0.5
-%          (beta is also called the bending constant for omega - default = 0.2)
+% INPUTS:  X and Y are 2 vectors or matrices (correlations are computed column-wise)
+%                  if X and Y are a vector and a matrix, the vector is
+%                  replicated to match the matrix size
+%          options are 'beta', the amount of trimming: 0 <= beta <= 0.5
+%                      (beta a.k.a. the bending constant for omega - default = 0.2)
+%                       'figure', if X and Y are vectors, this is 'on' by
+%                                default, if X and Y are matrices this 'off' by default
+%                      'alpha', the alpha level to use for the confidence interval
+%          If X and Y are matrices of size [n p], p correlations are computed and
+%          the CI are adjusted at a level alpha/p (Bonferonni correction)
 %
 % OUTPUTS: r is the percentage bend correlation
-%          t is the associated t value
-%          pval is the corresponding p value
-%          hboot 1/0 declares the test significant based on CI
-%          CI is the percentile bootstrap confidence interval
+%          t are the t-values using the standard equation and using the hc4 variance estimate
+%          pval are the p values corresponding to t-tests
+%          CI is 1-alpha confidence interval (only if all(pvals<alpha) or all(pvals>alpha))
+%     for multiple comparisons
 %          H is the measure of association between all pairs
 %          pH is the p value for an omnibus test of independence between all pairs 
 %
-% The percentage bend correlation is a robust method that protects against
-% outliers among the marginal distributions.
+%
+% If 'figure' is on, the data scatter plot is shown with the least
+% square fit of the data and the confidence intervals from the r value. As a
+% sanity check, the boostrapped correlations are also shown reporting the
+% median of bootstrapped value.
+%
+% References:
+% Godfrey (2006). Tests for regression models with heteroscedasticity of
+%                 unknown form. Comp Stat & Data Analysis, 50, 2715-2733 
+% Wilcox (2017). Introduction to Robust Estimation and Hypothesis Testing.
+%                4th Ed. Acedemic Press
+%
+% This function requires the tiedrank.m function from the matlab stat toolbox. 
+% See also TIEDRANK.
+%
+% Dr Cyril Pernet - University of Edinburgh
+% Dr Guillaume Rousselet - University of Glasgow
+% -----------------------------------------
+% Copyright (C) Corr_toolbox 2020
 
-% Cyril Pernet and Guillaume Rousselet 26-01-2011
-% Reformatted for Corr_toolbox 02--7-2012 
-% ----------------------------------------------
-%  Copyright (C) Corr_toolbox 2012
-
-%% data check
-
-if nargin<2
-    error('two input vectors requested')
-elseif nargin>4
-    eror('too many inputs')
-end
-
-% if X a vector and Y a matrix, 
-% repmat X to perform multiple tests on Y (or the other around)
-if size(X,1) == 1 && size(X,2) > 1; X = X'; end
-if size(Y,1) == 1 && size(Y,2) > 1; Y = Y'; end
-
-if size(X,2) == 1 && size(Y,2) > 1
-    X = repmat(X,1,size(Y,2));
-elseif size(Y,2) == 1 && size(X,2) > 1
-    Y = repmat(Y,1,size(X,2));
-end
-
-if sum(size(X)~=size(Y)) ~= 0
-    error('X and Y must have the same size')
-end
-
-%% parameters
-level = 5/100;
+%% input checks
 if nargin < 2
     error('two inputs requested');
-elseif nargin == 2
-    fig_flag = 1;
-    beta = 0.2;
-elseif nargin == 3
-    beta = 0.2;
+else
+    [X,Y] = check_corr_XY(X,Y);
 end
 
-if beta>1
-    beta = beta/100;
+% defaults
+nboot              = 1000;
+beta               = 0.2;
+alphav             = 5/100;
+heteroscedasticity = 'unspecified'; % undocumented, on/off forces to return a CI (never a NaN)
+if size(X,2) == 1 % and therefore size(Y,2) = 1 as well
+    figflag = 'on';
+else
+    figflag = 'off';
 end
 
+% check options
+for v=1:2:size(varargin,2)
+    if strcmpi(varargin{v},'figure')
+        figflag = varargin{v+1};
+    elseif strcmpi(varargin{v}(1:6),'hetero') 
+        heteroscedasticity = varargin{v+1};
+        if ~strcmpi(varargin{v},'heteroscedasticity')
+            fprintf('taking argument in ''%s'' as heteroscedasticity \n',varargin{v})
+        end
+    elseif strcmpi(varargin{v},'alpha')
+        alphav = varargin{v+1};
+        if ~isnumeric(alphav)
+            alphav = str2double(alphav);
+        end
+    elseif strcmpi(varargin{v},'beta')
+        beta = varargin{v+1};
+        if beta>1
+            beta = beta/100;
+        end
+    end
+end
+
+[n,p]  = size(X);
+alphav = alphav./ p;
 if beta<0 || beta>.5
     error('beta must be between 0 and 50%')
 end
 
-% remove NaNs
-% -----------
-X = [X Y];
-X(find(sum(isnan(X),2)),:) = [];
-n = length(X);
-
 %% compute
 % --------
-if nargout > 5
-    [r,t,p,XX,YY,H,pH] = bend_compute(X,beta);
+if nargout > 4
+    [r,t,p,XX,YY,H,pH] = bend_compute(X,beta,heteroscedasticity);
 else
-    [r,t,p,XX,YY] = bend_compute(X,beta);
+    [r,t,p,XX,YY] = bend_compute(X,beta,heteroscedasticity);
 end
 
 if nargout > 3 
     % bootstrap
     % -----------
     nboot = 1000;
-    level = level / (size(X,2)/2);
-     
-    low = round((level*nboot)/2);
+    low = round((alphav*nboot)/2);
     if low == 0
         error('adjusted CI cannot be computed, too many tests for the number of observations')
     else
         high = nboot - low;
     end
      
-    table = randi(n,n,nboot);
-    for B=1:nboot
-        tmp = X(table(:,B),:);
-        rb(B,:) = bend_compute(tmp,beta);
-        for c=1:size(X,2)/2
-            coef = pinv([tmp(:,c) ones(n,1)])*tmp(:,c+size(X,2)/2); 
-            intercept(B,c) = coef(2);
-            slope(B,c) = rb(B,c) / (std(tmp(:,c))/std(tmp(:,c+size(X,2)/2)));
+    % make a resampling boot_table with enough unique pairs
+    for B=nboot:-1:1
+        go = 0;
+        while go == 0
+            tmp = randi(n,n,1);
+            if length(unique(tmp))>=6
+                boot_table(:,B) = tmp;
+                go = 1;
+            end
         end
     end
     
+    % get bootrapped bend correlation
+    for B=nboot:-1:1
+        tmp = X(boot_table(:,B),:);
+        rb(B,:) = bend_compute(tmp,beta);
+    end
     rb = sort(rb);
-    slope = sort(slope,1);
-    intercept = sort(intercept,1);
 
     % CI and h
-    adj_nboot = nboot - sum(isnan(rb));
-    adj_low = round((level*adj_nboot)/2);
-    adj_high = adj_nboot - adj_low;
-    
-    for c=1:size(X,2)/2
-        CI(:,c) = [rb(adj_low(c),c) ; rb(adj_high(c),c)];
-        hboot(c) = (rb(adj_low(c),c) > 0) + (rb(adj_high(c),c) < 0);
-        CIslope(:,c) = [slope(adj_low(c),c) ; slope(adj_high(c),c)];
-        CIintercept(:,c) = [intercept(adj_low(c),c) ; intercept(adj_high(c),c)];
+    for c=size(X,2)/2:-1:1
+        CI(:,c) = [rb(low(c),c) ; rb(high(c),c)];
+        hboot(c) = (rb(low(c),c) > 0) + (rb(high(c),c) < 0);
     end
 end
  
 %% plot
 % -----
-if fig_flag ~= 0
-    answer = [];
-    if size(r,1) > 1
-        answer = questdlg('plots all correlations','Plotting option','yes','no','yes');
-    else
-        if fig_flag == 1
-            figure('Name','Bend correlation');
-            set(gcf,'Color','w');
-        end
-        
-        if nargout >3
-            subplot(1,2,1);
-            M = sprintf('Bend corr r=%g \n %g%%CI [%g %g]',r,(1-level)*100,rb(low),rb(high));
-        else
-            M = sprintf('Bend corr r=%g \n p=%g',r,p);
-        end
-        
-        scatter(X(:,1),X(:,2),100,'filled');
-        hold on; grid on;
-        % plot 'outliers'
+if strcmpi(figflag ,'on')
+    for f=1:length(r)
+        figure('Name',sprintf('Percentage bend correlation X%g Y%g',f,f));
+        set(gcf,'Color','w'); subplot(1,2,1);
         scatter(X(XX{1},1),X(XX{1},2),110,'r','LineWidth',3);
         scatter(X(YY{1},1),X(YY{1},2),110,'g','LineWidth',3);
         scatter(X(intersect(XX{1},YY{1}),1),X(intersect(XX{1},YY{1}),2),110,'k','LineWidth',3);
-        xlabel('X bend','FontSize',12); ylabel('Y bend','FontSize',12);
-        title(M,'FontSize',16); 
-        coef = pinv([X(:,1) ones(n,1)])*X(:,2);
-        s = r / (std(X(:,1))/std(X(:,2)));
-        h = refline(s,coef(2)); set(h,'Color','r','LineWidth',4);
-        box on;set(gca,'FontSize',14)
+        xlabel('X','FontSize',12); ylabel('Y','FontSize',12);grid on; box on; 
+        M = sprintf('r=%g \n %g%%CI [%.2f %.2f]',r(f),(1-alphav)*100,CI(1,f),CI(2,f));
+        title(M,'FontSize',14); h=lsline; set(h,'Color','r','LineWidth',4);
         
-        if  nargout>3
-            if sum(slope == 0) == 0
-                y1 = refline(CIslope(1),CIintercept(1)); set(y1,'Color','r');
-                y2 = refline(CIslope(2),CIintercept(2)); set(y2,'Color','r');
-                y1 = get(y1); y2 = get(y2);
-                xpoints=[[y1.XData(1):y1.XData(2)],[y2.XData(2):-1:y2.XData(1)]];
-                step1 = y1.YData(2)-y1.YData(1); step1 = step1 / (y1.XData(2)-y1.XData(1));
-                step2 = y2.YData(2)-y2.YData(1); step2 = step2 / (y2.XData(2)-y2.XData(1));
-                filled=[[y1.YData(1):step1:y1.YData(2)],[y2.YData(2):-step2:y2.YData(1)]];
-                hold on; fillhandle=fill(xpoints,filled,[1 0 0]);
-                set(fillhandle,'EdgeColor',[1 0 0],'FaceAlpha',0.2,'EdgeAlpha',0.8);%set edge color
-                box on;set(gca,'FontSize',14)
-            end
-            
-            subplot(1,2,2); k = round(1 + log2(length(rb))); hist(rb,k); grid on;
-            title({'Bootstrapped correlations';['h=' num2str(hboot)]},'FontSize',16); hold on
-            xlabel('boot correlations','FontSize',14);ylabel('frequency','FontSize',14)
-            plot(repmat(CI(1),max(hist(rb,k)),1),[1:max(hist(rb,k))],'r','LineWidth',4);
-            plot(repmat(CI(2),max(hist(rb,k)),1),[1:max(hist(rb,k))],'r','LineWidth',4);
-            axis tight; colormap([.4 .4 1])
-            box on;set(gca,'FontSize',14,'Layer','Top')
-        end
-    end
-    
-    if strcmp(answer,'yes')
-        for f = 1:length(r)
-            if fig_flag == 1
-                figure('Name',[num2str(f) ' boostrapped Bend correlation']);
-                set(gcf,'Color','w');
-            end
-            
-            if nargout > 3
-                subplot(1,2,1);
-                M = sprintf('Bend corr r=%g \n %g%%CI [%g %g]',r(f),(1-level)*100,CI(1,f),CI(2,f));
-            else
-                M = sprintf('Bend corr r=%g p=%g',r(f),p(f));
-            end
-            
-            scatter(X(:,f),X(:,f+size(X,2)/2),100,'b','filled'); 
-            hold on; grid on; 
-            % plot 'outliers'
-            scatter(X(XX{f},f),X(XX{f},f+size(X,2)/2),110,'r','LineWidth',3); 
-            scatter(X(YY{f},f),X(YY{f},f+size(X,2)/2),110,'g','LineWidth',3);
-            scatter(X(intersect(XX{f},YY{f}),f),X(intersect(XX{f},YY{f}),f+size(X,2)/2),110,'k','LineWidth',3);
-            xlabel('X bend','FontSize',12); ylabel('Y bend','FontSize',12);
-            title(M,'FontSize',16);
-            coef = pinv([X(:,f) ones(n,1)])*X(:,f+size(X,2)/2);
-            s = r(f) / (std(X(:,f))/std(X(:,f+size(X,2)/2)));
-            h = refline(s,coef(2)); set(h,'Color','r','LineWidth',4);
-            box on;set(gca,'FontSize',14,'Layer','Top')
-            
-            if nargout >3
-                if sum(slope(:,f) == 0) == 0
-                    y1 = refline(CIslope(1,f),CIintercept(1,f)); set(y1,'Color','r');
-                    y2 = refline(CIslope(2,f),CIintercept(2,f)); set(y2,'Color','r');
-                    y1 = get(y1); y2 = get(y2);
-                    xpoints=[[y1.XData(1):y1.XData(2)],[y2.XData(2):-1:y2.XData(1)]];
-                    step1 = y1.YData(2)-y1.YData(1); step1 = step1 / (y1.XData(2)-y1.XData(1));
-                    step2 = y2.YData(2)-y2.YData(1); step2 = step2 / (y2.XData(2)-y2.XData(1));
-                    filled=[[y1.YData(1):step1:y1.YData(2)],[y2.YData(2):-step2:y2.YData(1)]];
-                    hold on; fillhandle=fill(xpoints,filled,[1 0 0]);
-                    set(fillhandle,'EdgeColor',[1 0 0],'FaceAlpha',0.2,'EdgeAlpha',0.8);%set edge color
-                    box on;set(gca,'FontSize',14,'Layer','Top')
-                end
-                
-                subplot(1,2,2); k = round(1 + log2(size(rb,1))); hist(rb(:,f),k); grid on;
-                title({'Bootstrapped correlations';['h=',num2str(hboot(f))]},'FontSize',16); hold on
-                xlabel('boot correlations','FontSize',14);ylabel('frequency','FontSize',14)
-                plot(repmat(CI(1,f),max(hist(rb(:,f),k)),1),[1:max(hist(rb(:,f),k))],'r','LineWidth',4);
-                plot(repmat(CI(2,f),max(hist(rb(:,f),k)),1),[1:max(hist(rb(:,f),k))],'r','LineWidth',4);
-                axis tight; colormap([.4 .4 1])
-                box on;set(gca,'FontSize',14,'Layer','Top')
-            end
+        subplot(1,2,2); k = round(1 + log2(nboot));
+        MV = histogram(rb(:,f),k); MV = max(MV.Values); grid on;
+        title(sprintf('Bootstrapped correlations \n median=%g h=%g',median(rb),hboot(f)),'FontSize',14);
+        xlabel('boot correlations','FontSize',12);ylabel('frequency','FontSize',12)
+        hold on; plot(repmat(CI(1,f),MV,1),1:MV,'r','LineWidth',4);
+        axis tight; colormap([.4 .4 1]); box on;
+        plot(median(rb),MV/2,'ko','LIneWidth',3)
+        
+        if all(~isnan(CI(1:2,f))) % plot CI
+            plot(repmat(CI(2,f),MV,1),1:MV,'r','LineWidth',4);
+            subplot(1,2,1); hold on
+            betas = pinv([X(:,f) ones(n,1)])*Y(:,f);
+            transform = betas(1)/r(f);
+            y1 = refline(CI(1,f)*transform,betas(2)); set(y1,'Color','r');
+            y2 = refline(CI(2,f)*transform,betas(2)); set(y2,'Color','r');
+            y1 = get(y1); y2 = get(y2);
+            xpoints=[y1.XData(1):y1.XData(2),y2.XData(2):-1:y2.XData(1)];
+            step1 = y1.YData(2)-y1.YData(1); step1 = step1 / (y1.XData(2)-y1.XData(1));
+            step2 = y2.YData(2)-y2.YData(1); step2 = step2 / (y2.XData(2)-y2.XData(1));
+            filled=[y1.YData(1):step1:y1.YData(2),y2.YData(2):-step2:y2.YData(1)];
+            hold on; fillhandle=fill(xpoints,filled,[1 0 0]);
+            set(fillhandle,'EdgeColor',[1 0 0],'FaceAlpha',0.2,'EdgeAlpha',0.8);%set edge color
         end
     end
 end
-
 end
 
-function [r,t,p,XX,YY,H,pH] = bend_compute(X,beta)
+function [r,t,p,XX,YY,H,pH] = bend_compute(X,beta,heteroscedasticity)
 
 H= []; pH = [];
 
@@ -246,38 +199,37 @@ W = sort(abs(X-M),1);
  
 % limits
 % -------
-m = floor((1-beta)*size(X,1));
+m     = floor((1-beta)*size(X,1));
 omega = W(m,:); 
 
 %% Compute the correlation
 % ------------------------
-P = (X-M)./ repmat(omega,size(X,1),1); 
-P(isnan(P)) = 0; P(isinf(P)) = 0; % correct if omega = 0
-comb = [(1:size(X,2)/2)',((1:size(X,2)/2)+size(X,2)/2)']; % all pairs of columns
-r = NaN(size(comb,1),1); 
-t = r; p = t;
+P           = (X-M)./ repmat(omega,size(X,1),1); 
+P(isnan(P)) = 0; 
+P(isinf(P)) = 0; % correct if omega = 0
+comb        = [(1:size(X,2)/2)',((1:size(X,2)/2)+size(X,2)/2)']; % all pairs of columns
 
-for j = 1:size(comb,1)
+for j = size(comb,1):-1:1
     
     % column 1
-    psi = P(:,comb(j,1)); 
-    i1 = length(psi(psi<-1)); 
-    i2 = length(psi(psi>1)); 
-    sx = X(:,comb(j,1)); 
+    psi          = P(:,comb(j,1)); 
+    i1           = length(psi(psi<-1)); 
+    i2           = length(psi(psi>1)); 
+    sx           = X(:,comb(j,1)); 
     sx(psi<(-1)) = 0; 
-    sx(psi>1) = 0; 
-    pbos = (sum(sx)+ omega(comb(j,1))*(i2-i1)) / (size(X,1)-i1-i2); 
-    a = (X(:,comb(j,1))-pbos)./repmat(omega(comb(j,1)),size(X,1),1); 
+    sx(psi>1)    = 0; 
+    pbos         = (sum(sx)+ omega(comb(j,1))*(i2-i1)) / (size(X,1)-i1-i2); 
+    a            = (X(:,comb(j,1))-pbos)./repmat(omega(comb(j,1)),size(X,1),1); 
         
     % column 2
-    psi = P(:,comb(j,2));
-    i1 = length(psi(psi<-1));
-    i2 = length(psi(psi>1));
-    sx = X(:,comb(j,2));
+    psi          = P(:,comb(j,2));
+    i1           = length(psi(psi<-1));
+    i2           = length(psi(psi>1));
+    sx           = X(:,comb(j,2));
     sx(psi<(-1)) = 0;
-    sx(psi>1) = 0;
-    pbos = (sum(sx)+ omega(comb(j,2))*(i2-i1)) / (size(X,1)-i1-i2);
-    b = (X(:,comb(j,2))-pbos)./repmat(omega(comb(j,2)),size(X,1),1);
+    sx(psi>1)    = 0;
+    pbos         = (sum(sx)+ omega(comb(j,2))*(i2-i1)) / (size(X,1)-i1-i2);
+    b            = (X(:,comb(j,2))-pbos)./repmat(omega(comb(j,2)),size(X,1),1);
     
      % return values of a,b to plot 
      XX{j} = union(find(a <= -1),find(a >= 1)); 
@@ -289,16 +241,20 @@ for j = 1:size(comb,1)
      
      % get r, t and p
      r(j) = sum(a.*b)/sqrt(sum(a.^2)*sum(b.^2));
-     t(j) = r(j)*sqrt((size(X,1) - 2)/(1 - r(j).^2));
+     if strcmpi(heteroscedasticity,'on')
+         [~,~,~,S] = get_hc4stats(r,zr,zscore(X,0,1),zscore(Y,0,1));
+     else
+        S = sqrt((size(X,1) - 2)/(1 - r(j).^2)); 
+     end
+     t(j) = r(j)*S;
      p(j) = 2*(1 - tcdf(abs(t(j)),size(X,1)-2));
-
 end
 
 if size(X,2) > 2 && nargout > 5
     bv = 48*(size(X,1)-2.5).^2;
-    for j=1:length(comb)
-        c(j) = sqrt((size(X,1)-2.5)*log(1+t(j)^2/(size(X,1)-2))); % S plus: cmat<-sqrt((nrow(m)-2.5)*log(1+tstat^2/(nrow(m)-2)))\
-        z(j) = c(j) + (c(j)^3+3*c(j))/bv - ( (4*c(j).^7+33*c(j).^5+240*c(j)^3+855*c(j)) / (10*bv.^2+8*bv*c(j).^4+1000*bv) ); % S plus: cmat<-cmat+(cmat^3+3*cmat)/bv-(4*cmat^7+33*cmat^5+240^cmat^3+855*cmat)/(10*bv^2+8*bv*cmat^4+1000*bv)\
+    for j=length(comb):-1:1
+        c(j) = sqrt((size(X,1)-2.5)*log(1+t(j)^2/(size(X,1)-2))); 
+        z(j) = c(j) + (c(j)^3+3*c(j))/bv - ( (4*c(j).^7+33*c(j).^5+240*c(j)^3+855*c(j)) / (10*bv.^2+8*bv*c(j).^4+1000*bv) ); 
     end
     H =  sum(z.^2);
     pH= 1- cdf('chi2',H,(size(X,2)*(size(X,2)-1))/2);
