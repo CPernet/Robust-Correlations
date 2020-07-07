@@ -2,9 +2,9 @@ function [r,t,pval,CI] = Kendall(X,Y,varargin)
 
 % Computes the Kendall correlation with its bootstrap CI.
 %
-% FORMAT:  [r,t,p] = Spearman(X,Y)
-%          [r,t,p] = Spearman(X,Y,fig_flag,level)
-%          [r,t,p,hboot,CI] = Spearman(X,Y,fig_flag,level)
+% FORMAT:  [r,t,p] = Kendall(X,Y)
+%          [r,t,p] = Kendall(X,Y,fig_flag,level)
+%          [r,t,p,hboot,CI] = Kendall(X,Y,fig_flag,level)
 %
 % INPUTS:  X and Y are 2 vectors or matrices, in the latter case,
 %          correlations are computed column-wise 
