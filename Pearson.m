@@ -40,8 +40,11 @@ function [r,t,pval,CI] = Pearson(X,Y,varargin)
 % median of bootstrapped value.
 %
 % References:
-% Godfrey (2006)
-% Wilcox (2017)
+% Fisher (1925). Statistical Methods for research workers. 1st Ed. Oliver and Boyd
+% Godfrey (2006). Tests for regression models with heteroscedasticity of
+%                 unknown form. Comp Stat & Data Analysis, 50, 2715-2733 
+% Wilcox (2017). Introduction to Robust Estimation and Hypothesis Testing.
+%                4th Ed. Acedemic Press
 %
 % Dr Cyril Pernet - University of Edinburgh
 % -----------------------------------------
@@ -93,11 +96,14 @@ if nargout > 1 || strcmpi(figflag ,'on')
     zalpha                   = icdf('Normal',alphav/2,0,1);
     t                        = r.*sqrt((n-2)./(1-r.^2));
     pval                     = 2*tcdf(-abs(t),n-2);
-    S                        = 1/sqrt(n-3); % assumed standard error
-    if p==1
-        [t(2),pval(2),~,S_hc4] = get_hc4stats(r,zr,zscore(X,0,1),zscore(Y,0,1));
-    else
-        [t(2,:),pval(2,:),~,S_hc4] = get_hc4stats(r,zr,zscore(X,0,1),zscore(Y,0,1));
+    S                        = 1/sqrt(n-3); % % Fisher 1925
+    
+    if ~strcmpi(heteroscedasticity,'off') % specifically ask not to do this       
+        if p==1
+            [t(2),pval(2),~,S_hc4] = get_hc4stats(r,zscore(X,0,1),zscore(Y,0,1));
+        else
+            [t(2,:),pval(2,:),~,S_hc4] = get_hc4stats(r,zscore(X,0,1),zscore(Y,0,1));
+        end
     end
     
     for column = p:-1:1
@@ -111,14 +117,16 @@ if nargout > 1 || strcmpi(figflag ,'on')
     %% undocumented - do a percentile t for the hc4 CI (kinda work for n>80)
     if strcmpi(heteroscedasticity,'on')
         
-        for B=nboot:-1:1
-            % make a resampling table with enough unique pairs
-            go = 0;
-            while go == 0
-                tmp = randi(n,n,1);
-                if length(unique(tmp))>=6
-                    boot_table(:,B) = tmp;
-                    go = 1;
+        if ~exist('boot_table','var')
+            for B=nboot:-1:1
+                % make a resampling boot_table with enough unique pairs
+                go = 0;
+                while go == 0
+                    tmp = randi(n,n,1);
+                    if length(unique(tmp))>=6
+                        boot_table(:,B) = tmp;
+                        go = 1;
+                    end
                 end
             end
         end
@@ -127,11 +135,11 @@ if nargout > 1 || strcmpi(figflag ,'on')
         ibot = round(alphav*nboot/2)+1;
         itop = nboot-ibot+2;
         for column = p:-1:1
-            zX           = X(:,p);
+            zX           = X(:,column);
             zX           = zscore(zX(boot_table),0,1);
-            zY           = Y(:,p);
+            zY           = Y(:,column);
             zY           = zscore(zY(boot_table),0,1);
-            [~,~,B,S]    = get_hc4stats(r(column),zr(column),zX,zY); % all bootstraped betas and S
+            [~,~,B,S]    = get_hc4stats(r(column),zX,zY); % all bootstraped betas and S
             v            = sort((B-r(column))./sqrt(S));
             CI(:,column) = [r(column)-v(itop)*sqrt(S_hc4(column)) r(column)-v(ibot)*sqrt(S_hc4(column))]';
         end
@@ -145,7 +153,7 @@ if strcmpi(figflag ,'on')
     end
     for B=nboot:-1:1
         rb(B,:) = sum(detrend(X(boot_table(:,B),:),'constant').*detrend(Y(boot_table(:,B),:),'constant')) ./ ...
-            (sum(detrend(X(boot_table(:,B),:),'constant').^2).*sum(detrend(Y(table(:,B),:),'constant').^2)).^(1/2);
+            (sum(detrend(X(boot_table(:,B),:),'constant').^2).*sum(detrend(Y(boot_table(:,B),:),'constant').^2)).^(1/2);
     end
 end
 
@@ -162,11 +170,11 @@ if strcmpi(figflag ,'on')
         MV = histogram(rb(:,f),k); MV = max(MV.Values); grid on;
         title(sprintf('Bootstrapped correlations \n median=%g',median(rb)),'FontSize',14);
         xlabel('boot correlations','FontSize',12);ylabel('frequency','FontSize',12)
-        hold on; plot(repmat(CI(1,f),MV,1),1:MV,'r','LineWidth',4);
         axis tight; colormap([.4 .4 1]); box on;
-        plot(median(rb),MV/2,'ko','LIneWidth',3)
+        hold on; plot(median(rb),MV/2,'ko','LIneWidth',3)
         
         if all(~isnan(CI(1:2,f))) % plot CI
+            plot(repmat(CI(1,f),MV,1),1:MV,'r','LineWidth',4);
             plot(repmat(CI(2,f),MV,1),1:MV,'r','LineWidth',4);
             subplot(1,2,1); hold on
             betas = pinv([X(:,f) ones(n,1)])*Y(:,f);
