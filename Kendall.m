@@ -109,7 +109,7 @@ if nargout > 1 || strcmpi(figflag ,'on')
     K       = r.*Adj;
     v0      = n*(n-1)*(2*n+5);
     zalpha  = icdf('Normal',alphav/2,0,1);
-    
+
     for column = p:-1:1
         U            = unique(X(:,column));
         out          = arrayfun(@(x) find(X(:,column)==x),U,'UniformOutput',false);
@@ -127,7 +127,7 @@ if nargout > 1 || strcmpi(figflag ,'on')
         z(column)    = K(column) / sqrt(v);
         tmp          = cdf('Normal',z(column),0,1);
         pval(column) = min(tmp,1-tmp);
-        
+
         if nargout > 3
             if strcmpi(heteroscedasticity,'on')
                 for B=nboot:-1:1
@@ -141,7 +141,7 @@ if nargout > 1 || strcmpi(figflag ,'on')
                         end
                     end
                 end
-                
+
                 % resample and compute
                 ibot         = round(alphav*nboot/2)+1;
                 itop         = nboot-ibot+2;
@@ -179,7 +179,7 @@ if strcmpi(figflag ,'on')
             end
         end
     end
-    
+
     for column=p:-1:1
         tmp1         = X(:,column);
         tmp2         = Y(:,column);
@@ -199,14 +199,14 @@ if strcmpi(figflag ,'on')
         xlabel('X','FontSize',12); ylabel('Y','FontSize',12);
         M = sprintf('r=%g \n %g%%CI [%.2f %.2f]',r(f),(1-alphav)*100,CI(1,f),CI(2,f));
         title(M,'FontSize',14); h=lsline; set(h,'Color','r','LineWidth',4);
-        
+
         subplot(1,2,2); k = round(1 + log2(nboot));
         MV = histogram(rb(:,f),k); MV = max(MV.Values); grid on;
         title(sprintf('Bootstrapped correlations \n median=%g',median(rb(:,f))),'FontSize',14);
         xlabel('boot correlations','FontSize',12);ylabel('frequency','FontSize',12)
         axis tight; colormap([.4 .4 1]); box on;
         hold on; plot(median(rb(:,f)),MV/2,'ko','LIneWidth',3)
-        
+
         if all(~isnan(CI(1:2,f))) % plot CI
             plot(repmat(CI(1,f),MV,1),1:MV,'r','LineWidth',4);
             plot(repmat(CI(2,f),MV,1),1:MV,'r','LineWidth',4);
@@ -225,4 +225,3 @@ if strcmpi(figflag ,'on')
         end
     end
 end
-
