@@ -33,9 +33,10 @@ subplot(3,5,2:3);
 bar(x1,nu/(length(x)*h1),1,'FaceColor',[0.5 0.5 1]);
 v = max(yp) + 0.02*max(yp);
 grid on; axis([min(x)-1/10*min(x) max(x)+1/10*max(x) 0 v]); hold on
-plot(xp,yp,'r','LineWidth',3); title('Density histogram for X','Fontsize',16); 
+plot(xp,yp,'r','LineWidth',3); box on;set(gca,'FontSize',14)
+
+title('Density histogram for X','Fontsize',16); 
 ylabel('Freq.','FontSize',14); xlabel('X.','FontSize',14)
-box on;set(gca,'FontSize',14)
 
 % 2nd univariate histogram
 subplot(3,5,[6 11]);
