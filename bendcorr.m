@@ -1,4 +1,4 @@
-function [r,t,p,CI,H,pH] = bendcorr(X,Y,varargin)
+function [r,t,pval,CI,H,pH] = bendcorr(X,Y,varargin)
 
 % Computes the percentage bend correlation along with the bootstrap CI.
 % When H0 is rejected (say pval<0.05), it is reasonable to conclude that X
@@ -14,15 +14,15 @@ function [r,t,p,CI,H,pH] = bendcorr(X,Y,varargin)
 % the robust estimate is below, the discrepency is likely due to heteroscedasticity
 % and no good CI can be derived (returns NaN).
 %
-% FORMAT:  [r,t,p,CI]      = bendcorr(X,Y,'beta',0.2)
-%          [r,t,p,CI]      = bendcorr(X,Y,'beta',0.2,'figure','on','alpha',0.05)
-%          [r,t,p,CI,H,pH] = bendcorr(X,Y,'beta',0.2,'figure','on','alpha',0.05)
+% FORMAT:  [r,t,p,CI]      = bendcorr(X,Y,'beta',0.3)
+%          [r,t,p,CI]      = bendcorr(X,Y,'beta',0.3,'figure','on','alpha',0.05)
+%          [r,t,p,CI,H,pH] = bendcorr(X,Y,'beta',0.3,'figure','on','alpha',0.05)
 %
 % INPUTS:  X and Y are 2 vectors or matrices (correlations are computed column-wise)
 %                  if X and Y are a vector and a matrix, the vector is
 %                  replicated to match the matrix size
 %          options are 'beta', the amount of trimming: 0 <= beta <= 0.5
-%                      (beta a.k.a. the bending constant for omega - default = 0.2)
+%                      (beta a.k.a. the bending constant for omega - default = 0.3)
 %                       'figure', if X and Y are vectors, this is 'on' by
 %                                default, if X and Y are matrices this 'off' by default
 %                      'alpha', the alpha level to use for the confidence interval
@@ -66,7 +66,7 @@ end
 
 % defaults
 nboot              = 1000;
-beta               = 0.2;
+beta               = 0.3;
 alphav             = 5/100;
 heteroscedasticity = 'unspecified'; % undocumented, on/off forces to return a CI (never a NaN)
 if size(X,2) == 1 % and therefore size(Y,2) = 1 as well
@@ -79,7 +79,7 @@ end
 for v=1:2:size(varargin,2)
     if strcmpi(varargin{v},'figure')
         figflag = varargin{v+1};
-    elseif strcmpi(varargin{v}(1:6),'hetero') 
+    elseif strcmpi(varargin{v}(1:end-12),'hetero') 
         heteroscedasticity = varargin{v+1};
         if ~strcmpi(varargin{v},'heteroscedasticity')
             fprintf('taking argument in ''%s'' as heteroscedasticity \n',varargin{v})
@@ -94,6 +94,9 @@ for v=1:2:size(varargin,2)
         if beta>1
             beta = beta/100;
         end
+        if beta >0.5
+            error('can''t compute correlations ''removing'' more than 50% data, change beta value')
+        end
     end
 end
 
@@ -105,23 +108,23 @@ end
 
 %% compute
 % --------
-if nargout > 4
-    [r,t,p,XX,YY,H,pH] = bend_compute(X,beta,heteroscedasticity);
+if nargout <=4
+    [r,t,pval,XX,YY] = bend_compute([X Y],beta,heteroscedasticity);
 else
-    [r,t,p,XX,YY] = bend_compute(X,beta,heteroscedasticity);
+    [r,t,pval,XX,YY,H,pH] = bend_compute([X Y],beta,heteroscedasticity);
 end
 
-if nargout > 3 
+if nargout > 3 || strcmpi(figflag ,'on')
     % bootstrap
     % -----------
     nboot = 1000;
-    low = round((alphav*nboot)/2);
+    low   = round((alphav*nboot)/2);
     if low == 0
         error('adjusted CI cannot be computed, too many tests for the number of observations')
     else
         high = nboot - low;
     end
-     
+    
     % make a resampling boot_table with enough unique pairs
     for B=nboot:-1:1
         go = 0;
@@ -136,40 +139,42 @@ if nargout > 3
     
     % get bootrapped bend correlation
     for B=nboot:-1:1
-        tmp = X(boot_table(:,B),:);
-        rb(B,:) = bend_compute(tmp,beta);
+        tmp     = [X(boot_table(:,B),:) Y(boot_table(:,B),:)];
+        rb(B,:) = bend_compute(tmp,beta,heteroscedasticity);
     end
     rb = sort(rb);
-
+    
     % CI and h
-    for c=size(X,2)/2:-1:1
-        CI(:,c) = [rb(low(c),c) ; rb(high(c),c)];
-        hboot(c) = (rb(low(c),c) > 0) + (rb(high(c),c) < 0);
+    for c=p:-1:1
+        CI(:,c) = [rb(low,c) ; rb(high,c)];
     end
 end
- 
+
 %% plot
 % -----
 if strcmpi(figflag ,'on')
     for f=1:length(r)
         figure('Name',sprintf('Percentage bend correlation X%g Y%g',f,f));
         set(gcf,'Color','w'); subplot(1,2,1);
-        scatter(X(XX{1},1),X(XX{1},2),110,'r','LineWidth',3);
-        scatter(X(YY{1},1),X(YY{1},2),110,'g','LineWidth',3);
-        scatter(X(intersect(XX{1},YY{1}),1),X(intersect(XX{1},YY{1}),2),110,'k','LineWidth',3);
+        scatter(X(:,f),Y(:,f),100,'b','filled'); 
+        h=lsline; set(h,'Color','r','LineWidth',4);
+        hold on; grid on; 
+        scatter(X(XX{1},f),Y(XX{1},f),110,'r','LineWidth',3);
+        scatter(X(YY{1},1),Y(YY{1},f),110,'g','LineWidth',3);
+        scatter(X(intersect(XX{f},YY{f}),f),Y(intersect(XX{f},YY{f}),f),110,'k','LineWidth',3);
         xlabel('X','FontSize',12); ylabel('Y','FontSize',12);grid on; box on; 
         M = sprintf('r=%g \n %g%%CI [%.2f %.2f]',r(f),(1-alphav)*100,CI(1,f),CI(2,f));
-        title(M,'FontSize',14); h=lsline; set(h,'Color','r','LineWidth',4);
+        title(M,'FontSize',14); 
         
         subplot(1,2,2); k = round(1 + log2(nboot));
         MV = histogram(rb(:,f),k); MV = max(MV.Values); grid on;
-        title(sprintf('Bootstrapped correlations \n median=%g h=%g',median(rb),hboot(f)),'FontSize',14);
+        title(sprintf('Bootstrapped correlations \n median=%g h=%g',median(rb(:,f)),hboot(f)),'FontSize',14);
         xlabel('boot correlations','FontSize',12);ylabel('frequency','FontSize',12)
-        hold on; plot(repmat(CI(1,f),MV,1),1:MV,'r','LineWidth',4);
         axis tight; colormap([.4 .4 1]); box on;
-        plot(median(rb),MV/2,'ko','LIneWidth',3)
+        hold on; plot(median(rb(:,f)),MV/2,'ko','LIneWidth',3)
         
         if all(~isnan(CI(1:2,f))) % plot CI
+            plot(repmat(CI(1,f),MV,1),1:MV,'r','LineWidth',4);
             plot(repmat(CI(2,f),MV,1),1:MV,'r','LineWidth',4);
             subplot(1,2,1); hold on
             betas = pinv([X(:,f) ones(n,1)])*Y(:,f);
@@ -188,8 +193,13 @@ if strcmpi(figflag ,'on')
 end
 end
 
-function [r,t,p,XX,YY,H,pH] = bend_compute(X,beta,heteroscedasticity)
+function [r,t,p,XX,YY,h_boot,H,pH] = bend_compute(X,beta,heteroscedasticity)
 
+% X is a matrix = [X Y] from the function input
+% beta is the bending coefficient
+% heteroscedasticiy is used to swith estimate the covariance
+
+h_boot = NaN;
 H= []; pH = [];
 
 %% Medians and absolute deviation from the medians
@@ -207,7 +217,7 @@ omega = W(m,:);
 P           = (X-M)./ repmat(omega,size(X,1),1); 
 P(isnan(P)) = 0; 
 P(isinf(P)) = 0; % correct if omega = 0
-comb        = [(1:size(X,2)/2)',((1:size(X,2)/2)+size(X,2)/2)']; % all pairs of columns
+comb        = [(1:size(X,2)/2)',((1:size(X,2)/2)+size(X,2)/2)']; % all columns paired
 
 for j = size(comb,1):-1:1
     
@@ -241,13 +251,17 @@ for j = size(comb,1):-1:1
      
      % get r, t and p
      r(j) = sum(a.*b)/sqrt(sum(a.^2)*sum(b.^2));
-     if strcmpi(heteroscedasticity,'on')
-         [~,~,~,S] = get_hc4stats(r,zr,zscore(X,0,1),zscore(Y,0,1));
-     else
-        S = sqrt((size(X,1) - 2)/(1 - r(j).^2)); 
-     end
+     S = sqrt((size(X,1) - 2)/(1 - r(j).^2)); 
      t(j) = r(j)*S;
      p(j) = 2*(1 - tcdf(abs(t(j)),size(X,1)-2));
+     
+     if ~strcmpi(heteroscedasticity,'off') % specifically ask not to do this
+        if size(comb,1)
+            [t(2),p(2),~,V]     = get_hc4stats(r(j),zscore(X(:,comb(j,1)),0,1),zscore(X(:,comb(j,2)),0,1));
+        else
+            [t(2,:),p(2,:)] = get_hc4stats(r(j),zscore(X(:,comb(j,1)),0,1),zscore(X(:,comb(j,2)),0,1));
+        end
+     end
 end
 
 if size(X,2) > 2 && nargout > 5
