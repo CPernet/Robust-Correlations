@@ -33,8 +33,8 @@ if p==1 % if X row vector, transpose to column
     X=X'; 
     [p,N]=size(X);
 end
-q=.5; % median
-nboot = 1000; % use for 95% CI
+q      =.5; % median
+nboot  = 1000; % use for 95% CI
 alphav = 5/100; % for percentile bootstrap when n<11
 
 if nargout == 1 && nargin > 2
@@ -95,7 +95,7 @@ for i=1:N
             end
             
             % do bootstrap
-            for kk=1:nboot
+            parfor kk=1:nboot
                 boot(kk)=get_HD(randsample(x,n,true),q);
             end
             bse = std(boot,0); % normalize by (n-1)
