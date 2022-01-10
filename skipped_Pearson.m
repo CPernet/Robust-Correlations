@@ -126,7 +126,8 @@ for outputs = 2:nargout
     elseif outputs == 5
         outid = cell(size(pairs,1),1);
     end
-    
+end
+
     % loop for each pair to test
     for row = 1:size(pairs,1)
         
@@ -169,13 +170,13 @@ for outputs = 2:nargout
     
     
     %% once we have all the r and t values, we need to adjust for multiple comparisons
-    if nargout > 3
+    if nargout == 6
         if strcmp(method,'ECP')
             if exist('p_alpha','var')
                 h = pval < p_alpha;
             else
                 disp('ECP method requested, computing p alpha ... (takes a while)')
-                p_alpha = MC_corrpval(n,p,'Skipped Pearson',alphav,pairs);
+                [~,~,p_alpha] = MC_corrpval(n,p,'Skipped Pearson',alphav,pairs);
             end
         elseif strcmp('method','Hochberg')
             [sorted_pval,index] = sort(pval,'descend');
@@ -193,5 +194,5 @@ for outputs = 2:nargout
     
     %% quick clean-up of individual p-values
     pval(pval==0) = 1/nboot;
-end  
+    
 disp('Skipped Pearson done')
