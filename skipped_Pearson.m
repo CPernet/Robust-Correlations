@@ -177,6 +177,7 @@ end
             else
                 disp('ECP method requested, computing p alpha ... (takes a while)')
                 [~,~,p_alpha] = MC_corrpval(n,p,'Skipped Pearson',alphav,pairs);
+                h = pval < p_alpha;
             end
         elseif strcmp('method','Hochberg')
             [sorted_pval,index] = sort(pval,'descend');
