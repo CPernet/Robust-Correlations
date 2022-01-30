@@ -526,8 +526,7 @@ if area < Inf
     YE = ycmin + bmin * st;
     XEmin = XE * ct0 - YE * st0;
     YEmin = XE * st0 + YE * ct0;
-end;
-
+end
 
 % Previous part found the best matching ellipse for any group of 4 points
 % That's fine, but may be there exist better matches using groups of 3 points
@@ -550,6 +549,7 @@ for f = 1:n - 2
 
             % Newton iterative method
             theta = pi; error = 1;
+            tic;
             while abs(error) > 1e-6
                 cth = cos(theta); sth = sin(theta);
                 a1 = a(1) * cth + b(1) * sth; b1 = -a(1) * sth + b(1) * cth;
@@ -561,6 +561,9 @@ for f = 1:n - 2
                 dfth = 2*(da1.*db1 - da2.*db2).*(db1.^2 - db3.^2 + da1.^2 - da3.^2)- 2*(db1.*da1 - db3.*da3).*(da1.^2 - da2.^2 + db1.^2 - db2.^2);
                 error = - fth / dfth;
                 theta = theta + error;
+                if toc > 2 % should have converged quickly
+                   break 
+                end
             end
             cth = cos(theta); sth = sin(theta);
             a1 = a(1) * cth + b(1) * sth; b1 = -a(1) * sth + b(1) * cth;
