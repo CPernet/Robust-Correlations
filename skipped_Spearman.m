@@ -118,12 +118,13 @@ rs    = NaN(size(pairs,1),1);
 for outputs = 2:nargout
     if outputs == 2
     ts    = NaN(size(pairs,1),1);
-elseif outputs == 3
-  CI = NaN(size(pairs,1),2);
-elseif outputs == 4
-  pval  = NaN(size(pairs,1),1);
-elseif outputs == 5
-  outid = cell(size(pairs,1),1);
+    elseif outputs == 3
+      CI = NaN(size(pairs,1),2);
+    elseif outputs == 4
+      pval  = NaN(size(pairs,1),1);
+    elseif outputs == 5
+      outid = cell(size(pairs,1),1);
+    end
 end
 
 % loop for each pair to test
