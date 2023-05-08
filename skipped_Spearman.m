@@ -35,9 +35,9 @@ function [rs,ts,CI,pval,outid,h]=skipped_Spearman(varargin)
 % thus for a correlation this is floor(n/2 + 5/2).
 %
 % The method for multiple comparisons correction is described in
-% Rand R. Wilcox, Guillaume A. Rousselet & Cyril R. Pernet (2018) 
-% Improved methods for making inferences about multiple skipped correlations, 
-% Journal of Statistical Computation and Simulation, 88:16, 3116-3131, 
+% Rand R. Wilcox, Guillaume A. Rousselet & Cyril R. Pernet (2018)
+% Improved methods for making inferences about multiple skipped correlations,
+% Journal of Statistical Computation and Simulation, 88:16, 3116-3131,
 % DOI: 10.1080/00949655.2018.1501051
 %
 % See also MCDCOV, IDEALF.
@@ -97,16 +97,16 @@ end
 
 % _create a table of resamples_
 if nargout > 2
-  boot_index = 1;
-  while boot_index <= nboot
-      resample = randi(n,n,1);
-      if length(unique(resample)) > 3 % at least 3 different data points
-          boostrap_sampling(:,boot_index) = resample;
-          boot_index = boot_index +1;
-      end
-  end
-  lower_bound = round((alphav*nboot)/2);
-  upper_bound = nboot - lower_bound;
+    boot_index = 1;
+    while boot_index <= nboot
+        resample = randi(n,n,1);
+        if length(unique(resample)) > 3 % at least 3 different data points
+            boostrap_sampling(:,boot_index) = resample;
+            boot_index = boot_index +1;
+        end
+    end
+    lower_bound = round((alphav*nboot)/2);
+    upper_bound = nboot - lower_bound;
 end
 
 % now for each pair to test, get the observed and boostrapped r and t
@@ -117,13 +117,14 @@ end
 rs    = NaN(size(pairs,1),1);
 for outputs = 2:nargout
     if outputs == 2
-    ts    = NaN(size(pairs,1),1);
-elseif outputs == 3
-  CI = NaN(size(pairs,1),2);
-elseif outputs == 4
-  pval  = NaN(size(pairs,1),1);
-elseif outputs == 5
-  outid = cell(size(pairs,1),1);
+        ts    = NaN(size(pairs,1),1);
+    elseif outputs == 3
+        CI = NaN(size(pairs,1),2);
+    elseif outputs == 4
+        pval  = NaN(size(pairs,1),1);
+    elseif outputs == 5
+        outid = cell(size(pairs,1),1);
+    end
 end
 
 % loop for each pair to test
