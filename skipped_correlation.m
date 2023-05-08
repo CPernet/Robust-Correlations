@@ -47,9 +47,7 @@ function [r,t,h,outid,hboot,CI]=skipped_correlation(x,y,fig_flag)
 
 if nargin <2 
     error('not enough input arguments');
-elseif nargin == 2
-    fig_flag = 1;
-elseif nargin > 3
+elseif nargin > 4
     error('too many input arguments');
 end
 
@@ -93,6 +91,7 @@ for column = 1:p
     end
     
     X = [x(:,column) y(:,column)];
+    X(isnan(sum(X,2)),:) = [];
     % flag bivariate outliers
     flag = bivariate_outliers(X);
     % remove outliers
