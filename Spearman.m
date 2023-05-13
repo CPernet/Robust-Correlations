@@ -1,4 +1,4 @@
-function [r,t,pval,CI] = Spearman(X,Y,varargin)
+function [r,t,pval,CI,alphav] = Spearman(X,Y,varargin)
 
 % Computes the Spearman correlation along with the alpha percent CI using
 % the Z-transform but a critical value based on the Student t-distribution
@@ -125,7 +125,7 @@ if nargout > 1 || strcmpi(figflag ,'on')
         % compute CI
         if all(pval(:,column)<alphav) || all(pval(:,column)>alphav) || strcmpi(heteroscedasticity,'off')
             if abs(r(column)) < 0.95
-                S   = (1+((r.^2)./2))./sqrt(n-3); % Bonnett & Wright, 2000
+                S   = (1+((r(column).^2)./2))./sqrt(n-3); % Bonnett & Wright, 2000
                 CI(:,column) = tanh([zr(column)-abs(talpha)*S ; zr(column)+abs(talpha)*S]); % Ruscio 2008
                 % https://pdfs.semanticscholar.org/5928/703dd11ca405e1074c87642aaa0b095a8d92.pdf
             else
@@ -204,7 +204,7 @@ if strcmpi(figflag ,'on')
 
         subplot(1,2,2); k = round(1 + log2(nboot));
         MV = histogram(rb(:,f),k); MV = max(MV.Values); grid on;
-        title(sprintf('Bootstrapped correlations \n median=%g',median(rb)),'FontSize',14);
+        title(sprintf('Bootstrapped correlations \n median=%g',median(rb(f))),'FontSize',14);
         xlabel('boot correlations','FontSize',12);ylabel('frequency','FontSize',12)
         axis tight; colormap([.4 .4 1]); box on;
         hold on; plot(median(rb),MV/2,'ko','LIneWidth',3)
