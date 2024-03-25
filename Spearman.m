@@ -10,7 +10,7 @@ function [r,t,pval,CI,alphav] = Spearman(X,Y,varargin)
 % the t value relies on a wrong estimate of the variance, i.e. the test
 % statisitics t, tests if X and Y are independent rather than testing if
 % rho =0. Therefore, if pval is below the alpha level (H0 rejected) it should
-% be compared to a robust t-test version that correct the covariance. Here,
+% be compared to a robust t-test version that corrects the covariance. Here,
 % we return in t(2) and pval(2) such values using the HC4 estimator of the
 % standard error (Godfrey, 2006). If that second p-value is also below alpha,
 % CI are retuned using the standard z-transform. If pval is above alpha, but
